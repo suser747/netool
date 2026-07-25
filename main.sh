@@ -78,6 +78,7 @@ else
   exit 1
 fi
 trap on_error ERR
+trap '[[ -n "${NETOOL_BOOTSTRAP_DIR:-}" ]] && rm -rf "$NETOOL_BOOTSTRAP_DIR"' EXIT
 
 TOOL_EXIT_CODE=0
 SELECTED_ACTION=""
@@ -189,6 +190,8 @@ detect_os() {
 }
 
 check_display_env() {
+  [[ "${NETOOL_SKIP_LOCALE_TIP:-0}" == "1" ]] && return 0
+
   detect_os
 
   local encoding_ok=0 has_zh_locale=0 need_tip=0
@@ -821,6 +824,8 @@ run_tool() {
     TOOL_EXIT_CODE=0
     export NETOOL=1
     export AYU_TOOLBOX=1
+    export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
+    export NETOOL_MAIN_SH="${SCRIPT_DIR}/main.sh"
     if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
       bash "$local_path" "$@" </dev/tty || TOOL_EXIT_CODE=$?
     else
@@ -847,6 +852,7 @@ run_tool() {
   export NETOOL=1
   export AYU_TOOLBOX=1
   export NETOOL_REMOTE=1
+  export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
   export NETOOL_COMMON_FILE="${tmp_root}/tools/common.sh"
 
   TOOL_EXIT_CODE=0

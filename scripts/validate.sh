@@ -27,6 +27,7 @@ fi
 
 echo "==> 冒烟测试"
 export NETOOL_SKIP_LICENSE=1
+export NETOOL_SKIP_LOCALE_TIP=1
 bash main.sh --version >/dev/null || fail=1
 bash main.sh check >/dev/null || fail=1
 bash main.sh mirror --version >/dev/null || fail=1

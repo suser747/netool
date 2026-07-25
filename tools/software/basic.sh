@@ -32,6 +32,10 @@ set -Eeuo pipefail
 SCRIPT_NAME="basic-tools"
 SCRIPT_VERSION="1.0"
 
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
+
 # 需要安装的基础软件包列表（统一名称，由 mapped_packages 做发行版映射）
 PACKAGES=(curl wget git vim nano unzip tar gzip ca-certificates net-tools dnsutils lsof htop iotop iftop)
 # 是否仅打印安装计划（不实际执行）
@@ -39,125 +43,6 @@ DRY_RUN=0
 # 是否跳过确认提示直接执行
 YES=0
 
-# 终端颜色变量（非交互环境下保持为空，避免 ANSI 转义污染日志）
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-# 标准输出为终端时启用彩色输出
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-# 作为 netool 懒人工具箱子模块被调用时禁用彩色输出
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# -----------------------------------------------------------------------------
-# 函数: log_info
-# 功能: 输出信息级日志（青色 [信息] 前缀）
-# 参数: $1..$N - 日志内容
-# 返回值: 始终 0
-# -----------------------------------------------------------------------------
-log_info() { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_success
-# 功能: 输出成功级日志（绿色 [完成] 前缀）
-# 参数: $1..$N - 日志内容
-# 返回值: 始终 0
-# -----------------------------------------------------------------------------
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_warn
-# 功能: 输出警告级日志（黄色 [警告] 前缀）
-# 参数: $1..$N - 日志内容
-# 返回值: 始终 0
-# -----------------------------------------------------------------------------
-log_warn() { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_error
-# 功能: 输出错误级日志（红色 [错误] 前缀），输出到 stderr
-# 参数: $1..$N - 日志内容
-# 返回值: 始终 0
-# -----------------------------------------------------------------------------
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-
-# -----------------------------------------------------------------------------
-# 函数: die
-# 功能: 输出错误日志并立即退出脚本
-# 参数: $1..$N - 错误信息
-# 返回值: 无（脚本退出码 1）
-# -----------------------------------------------------------------------------
-die() { log_error "$*"; exit 1; }
-
-# -----------------------------------------------------------------------------
-# 函数: on_error
-# 功能: ERR 信号陷阱函数，捕获命令执行失败时的行号与退出码
-# 参数: 无（通过 $BASH_LINENO 与 $? 获取上下文）
-# 返回值: 无（以原退出码退出）
-# -----------------------------------------------------------------------------
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-# -----------------------------------------------------------------------------
-# 函数: read_prompt
-# 功能: 向用户展示提示并读取一行输入，兼容管道与无 tty 环境
-# 参数: $1 - 提示文本, $2 - 用于存放输入值的变量名
-# 返回值: 0 - 读取成功, 1 - 读取失败
-# -----------------------------------------------------------------------------
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-
-  # 当 stdin 非 tty 但 stdout 是 tty 时（典型为管道喂入场景），尝试从 /dev/tty 读取
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-
-  # 退化路径: 直接从 stdin 读取
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-# -----------------------------------------------------------------------------
-# 函数: command_exists
-# 功能: 判断指定命令是否在 PATH 中可用
-# 参数: $1 - 命令名
-# 返回值: 0 - 存在, 1 - 不存在
-# -----------------------------------------------------------------------------
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 # -----------------------------------------------------------------------------
 # 函数: usage

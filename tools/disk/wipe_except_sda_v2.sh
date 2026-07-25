@@ -34,6 +34,10 @@ set -Eeuo pipefail
 SCRIPT_NAME="wipe-except-sda"
 SCRIPT_VERSION="2.0"
 
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
+
 # -----------------------------------------------------------------------------
 # 函数: usage
 # 功能: 显示脚本使用说明
@@ -70,48 +74,6 @@ PLAN_ONLY=0
 YES=0
 DEVICES=""
 EXCLUDE_DEVICES=""
-
-# 颜色控制: 终端输出启用 ANSI 颜色；被工具箱调用或非终端时关闭颜色
-COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m' COLOR_GREEN=$'\033[32m' COLOR_YELLOW=$'\033[33m'
-  COLOR_CYAN=$'\033[36m' COLOR_BOLD=$'\033[1m' COLOR_RESET=$'\033[0m'
-fi
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-fi
-
-# -----------------------------------------------------------------------------
-# 函数: log_info
-# 功能: 输出信息级别日志 (青色 [信息])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_info()    { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_success
-# 功能: 输出成功级别日志 (绿色 [完成])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_warn
-# 功能: 输出警告级别日志 (黄色 [警告])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_warn()    { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_error
-# 功能: 输出错误级别日志 (红色 [错误])，输出到 stderr
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_error()   { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
 
 # 参数解析: 支持 fast/discard/zero 位置参数，以及 --plan/--devices/--mode/
 # --exclude/-y/--yes/-h/--help 选项；未知参数报错退出

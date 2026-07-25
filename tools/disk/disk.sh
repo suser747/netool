@@ -36,6 +36,10 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="disk-manager"
 SCRIPT_VERSION="2.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 REPO_URL="https://gitee.com/suser747/netool"
 SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/tools/disk/disk.sh"
 RAW_BASE_URL="https://gitee.com/suser747/netool/raw/master"
@@ -55,108 +59,6 @@ DRY_RUN=0
 ACTION=""
 PASSTHROUGH_ARGS=()
 
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# -----------------------------------------------------------------------------
-# 函数: log_info
-# 功能: 输出信息级别日志 (青色 [信息])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_info() { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_success
-# 功能: 输出成功级别日志 (绿色 [完成])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_warn
-# 功能: 输出警告级别日志 (黄色 [警告])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_warn() { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_error
-# 功能: 输出错误级别日志 (红色 [错误])，输出到 stderr
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-
-# -----------------------------------------------------------------------------
-# 函数: die
-# 功能: 输出错误消息并以退出码 1 退出脚本
-# 参数: $* - 待打印的错误消息内容
-# 返回值: 不返回 (脚本以退出码 1 退出)
-# -----------------------------------------------------------------------------
-die() { log_error "$*"; exit 1; }
-
-# -----------------------------------------------------------------------------
-# 函数: read_prompt
-# 功能: 从终端读取用户输入，优先尝试 /dev/tty 以兼容管道调用场景
-# 参数: $1 - 提示文本
-#       $2 - 用于存放读取结果的变量名
-# 返回值: 0 - 读取成功；1 - 读取失败 (EOF 或无可用 tty)
-# 说明: 通过 printf -v 将读取到的值写入调用方指定变量名，避免子 shell 污染。
-# -----------------------------------------------------------------------------
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-# -----------------------------------------------------------------------------
-# 函数: command_exists
-# 功能: 检查指定命令是否存在
-# 参数: $1 - 待检查的命令名
-# 返回值: 0 - 命令存在；1 - 命令不存在
-# -----------------------------------------------------------------------------
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 # -----------------------------------------------------------------------------
 # 函数: on_error
@@ -1067,8 +969,6 @@ parse_args() {
 # 说明: 未指定 ACTION 时进入交互式菜单循环，直到用户选择返回。
 # -----------------------------------------------------------------------------
 main() {
-  # shellcheck source=../load_common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "disk" "另一个 disk 实例正在运行，请等待其完成后再试。" || return 1
   parse_args "$@"
   print_banner

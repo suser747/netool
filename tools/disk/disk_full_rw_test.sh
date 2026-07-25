@@ -34,6 +34,10 @@ set -Eeuo pipefail
 SCRIPT_NAME="disk-full-rw-test"
 SCRIPT_VERSION="2.0"
 
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
+
 YES=0
 PLAN_ONLY=0
 DISK_CONCURRENCY=2
@@ -95,47 +99,6 @@ USAGE
 log() {
     echo "[$(date '+%F %T')] $*" >&2
 }
-
-COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m' COLOR_GREEN=$'\033[32m' COLOR_YELLOW=$'\033[33m'
-  COLOR_CYAN=$'\033[36m' COLOR_BOLD=$'\033[1m' COLOR_RESET=$'\033[0m'
-fi
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-fi
-
-# -----------------------------------------------------------------------------
-# 函数: log_info
-# 功能: 输出信息级别日志 (青色 [信息])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_info()    { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_success
-# 功能: 输出成功级别日志 (绿色 [完成])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_warn
-# 功能: 输出警告级别日志 (黄色 [警告])
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_warn()    { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-
-# -----------------------------------------------------------------------------
-# 函数: log_error
-# 功能: 输出错误级别日志 (红色 [错误])，输出到 stderr
-# 参数: $* - 待打印的消息内容
-# 返回值: 始终返回 0
-# -----------------------------------------------------------------------------
-log_error()   { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
 
 # -----------------------------------------------------------------------------
 # 函数: need_cmd

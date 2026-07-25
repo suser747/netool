@@ -25,101 +25,15 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="docker-tools"
 SCRIPT_VERSION="1.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 # 交互/批量模式标志：1 表示跳过所有二次确认（-y / --yes 触发）
 YES=0
 # 安装时是否配置国内镜像加速器：1 表示配置（--mirror 触发）
 CONFIGURE_MIRROR=0
 
-# =============================================================================
-# 颜色控制（仅 TTY 启用；管道/AYU_TOOLBOX 模式下自动禁用）
-# =============================================================================
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-# 终端输出时启用 ANSI 颜色，提升可读性
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-# 被外层工具箱（AYU_TOOLBOX）调用时禁用颜色，避免双重视觉装饰
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# =============================================================================
-# 统一日志函数
-# =============================================================================
-## 输出普通信息到标准输出
-log_info()    { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-## 输出成功信息到标准输出
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-## 输出警告信息到标准输出
-log_warn()    { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-## 输出错误信息到标准错误
-log_error()   { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-## 输出错误信息并以退出码 1 终止脚本
-die()         { log_error "$*"; exit 1; }
-
-# =============================================================================
-# 错误捕获
-# =============================================================================
-## 配合 `trap on_error ERR` 使用，捕获错误时输出失败行号与退出码
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-# =============================================================================
-# 通用工具函数
-# =============================================================================
-## 交互式读取用户输入并写入指定变量
-## 参数1: 提示文本  参数2: 接收输入的变量名
-## 返回值: 0 成功读取；1 读取失败
-## 兼容管道执行场景：当 stdin 已被占用时改从 /dev/tty 读取
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-
-  # 管道场景：stdin 不是 TTY 但 stdout 是 TTY 且 /dev/tty 可读时，从 /dev/tty 读取
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-
-  # 普通场景：直接通过 stdin 读取
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-## 检测指定命令是否存在
-## 参数1: 命令名  返回值: 0 存在；1 不存在
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 ## 校验 Docker 已安装，未安装时给出明确的安装引导并终止
 ## 用于 ps/images/volumes/networks/logs 等需要 docker 命令的操作

@@ -49,6 +49,10 @@ set -Eeuo pipefail
 SCRIPT_NAME="homebrew"
 SCRIPT_VERSION="2.0"
 
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
+
 # 命令行参数标志（在入口参数解析处赋值）
 # DRY_RUN=1 时仅预览将要执行的操作，不实际执行
 # YES=1 时非交互模式，所有确认提示自动按默认值（或确认）继续
@@ -115,14 +119,6 @@ log_info()    { echo "${tty_bold}${tty_cyan}[信息]${tty_reset} $*"; }     # �
 log_success() { echo "${tty_bold}${tty_green}[完成]${tty_reset} $*"; }    # 操作成功
 log_warn()    { echo "${tty_bold}${tty_yellow}[警告]${tty_reset} $*"; }   # 警告信息
 log_error()   { echo "${tty_bold}${tty_red}[错误]${tty_reset} $*" >&2; }  # 错误信息（输出到 stderr）
-
-# 错误捕获 trap: 脚本任意命令失败时触发，打印出错行号和退出码
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-trap on_error ERR
 
 # ============================================================
 # 平台初始化

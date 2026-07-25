@@ -33,102 +33,15 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="firewall-tools"
 SCRIPT_VERSION="2.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 YES=0
 DRY_RUN=0
 # 防火墙规则集备份根目录: 每次修改前在此目录下生成带时间戳的规则快照
 BACKUP_DIR="/var/backups/netool-firewall"
 
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# ------------------------------------------------------------------------------
-# 函数: log_info / log_success / log_warn / log_error
-# 功能: 统一日志输出函数，遵循 TTY/AYU_TOOLBOX 的颜色抑制规则
-# 参数: $* - 要输出的文本
-# 返回值: 始终 0（die 除外）
-# ------------------------------------------------------------------------------
-log_info() { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-log_warn() { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-
-# ------------------------------------------------------------------------------
-# 函数: die
-# 功能: 输出错误信息并以退出码 1 终止脚本
-# 参数: $* - 错误信息文本
-# 返回值: 不返回（直接退出 1）
-# ------------------------------------------------------------------------------
-die() { log_error "$*"; exit 1; }
-
-# ------------------------------------------------------------------------------
-# 函数: on_error
-# 功能: ERR trap 回调，捕获命令执行失败时打印行号与退出码后退出
-# 参数: 无（通过 $? 获取退出码）
-# 返回值: 不返回（直接退出原退出码）
-# ------------------------------------------------------------------------------
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-# ------------------------------------------------------------------------------
-# 函数: read_prompt
-# 功能: 读取用户输入到指定变量名，兼容管道与无 TTY 环境
-# 参数: $1 - 提示文本；$2 - 用于存放输入的变量名
-# 返回值: 0 表示读取成功，非 0 表示 EOF 或读取失败
-# ------------------------------------------------------------------------------
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-# ------------------------------------------------------------------------------
-# 函数: command_exists
-# 功能: 检查指定命令是否在 PATH 中可用
-# 参数: $1 - 命令名
-# 返回值: 0 表示存在，非 0 表示不存在
-# ------------------------------------------------------------------------------
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 # ------------------------------------------------------------------------------
 # 函数: require_root
@@ -356,8 +269,6 @@ do_allow() {
 # 返回值: 透传子命令的退出码
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=../load_common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "firewall" "另一个 firewall 实例正在运行，请等待其完成后再试。" || return 1
   local action="${1:-status}"
   [[ $# -gt 0 ]] && shift || true

@@ -18,6 +18,10 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="ssl-check"
 SCRIPT_VERSION="1.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 # 到期告警阈值（天）：剩余天数小于等于该值即标记为"即将到期"
 WARN_DAYS=30
 # 默认端口
@@ -25,68 +29,6 @@ PORT=443
 # 待检查目标列表（支持 "domain" 或 "domain:port" 格式）
 TARGETS=()
 
-# 颜色控制变量：仅在终端输出时启用颜色，被父工具箱调用时强制关闭颜色
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-# 标准输出连接到终端时初始化 ANSI 颜色转义码
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-# 作为子模块被父工具箱调用时关闭颜色，避免日志格式混乱
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# 统一日志输出函数，带颜色与级别前缀
-# 参数：$* - 要输出的消息内容
-# 返回值：0 - 成功（die 除外）
-log_info() { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-log_warn() { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-# 输出错误消息后立即退出，退出码 1
-# 参数：$* - 错误消息
-# 返回值：1 - 始终退出
-die() { log_error "$*"; exit 1; }
-
-# 函数名：on_error
-# 功能：ERR 信号回调，在 set -e 触发退出前打印出错行号与退出码
-# 参数：由 trap 自动注入
-# 返回值：以原退出码退出
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-# 函数名：command_exists
-# 功能：检查指定命令是否在 PATH 中可用
-# 参数：$1 - 命令名
-# 返回值：0 - 存在, 非 0 - 不存在
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 # 函数名：usage
 # 功能：输出脚本帮助信息
@@ -271,8 +213,6 @@ load_targets_from_file() {
 # 参数：$@ - 命令行参数（域名/IP 与选项）
 # 返回值：0 - 成功, 非 0 - 加锁失败或检查错误
 main() {
-  # shellcheck source=../load_common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "ssl-check" "另一个 ssl-check 实例正在运行，请等待其完成后再试。" || return 1
 
   local file=""

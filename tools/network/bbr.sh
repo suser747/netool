@@ -34,124 +34,16 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="bbr-tools"
 SCRIPT_VERSION="2.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 CONF_FILE="/etc/sysctl.d/99-netool-bbr.conf"
 # 备份根目录: 每次启用 BBR 时在此目录下生成 sysctl.conf.bak.<时间戳> 文件
 BACKUP_DIR="/var/backups/netool-bbr"
 DRY_RUN=0
 YES=0
 
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
-
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED=""
-  COLOR_GREEN=""
-  COLOR_YELLOW=""
-  COLOR_BLUE=""
-  COLOR_CYAN=""
-  COLOR_BOLD=""
-  COLOR_RESET=""
-fi
-
-# ------------------------------------------------------------------------------
-# 函数: log_info
-# 功能: 输出信息级别日志,带颜色前缀,遵循 TTY/AYU_TOOLBOX 的颜色抑制规则
-# 参数: $* - 要输出的消息内容
-# 返回值: 0 - 成功
-# ------------------------------------------------------------------------------
-log_info() { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-
-# ------------------------------------------------------------------------------
-# 函数: log_success
-# 功能: 输出成功级别日志,带颜色前缀
-# 参数: $* - 要输出的消息内容
-# 返回值: 0 - 成功
-# ------------------------------------------------------------------------------
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-
-# ------------------------------------------------------------------------------
-# 函数: log_warn
-# 功能: 输出警告级别日志,带颜色前缀
-# 参数: $* - 要输出的消息内容
-# 返回值: 0 - 成功
-# ------------------------------------------------------------------------------
-log_warn() { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-
-# ------------------------------------------------------------------------------
-# 函数: log_error
-# 功能: 输出错误级别日志到 stderr,带颜色前缀
-# 参数: $* - 要输出的消息内容
-# 返回值: 0 - 成功
-# ------------------------------------------------------------------------------
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-
-# ------------------------------------------------------------------------------
-# 函数: die
-# 功能: 输出错误消息后立即退出
-# 参数: $* - 错误消息
-# 返回值: 1 - 始终以退出码 1 退出
-# ------------------------------------------------------------------------------
-die() { log_error "$*"; exit 1; }
-
-# ------------------------------------------------------------------------------
-# 函数: on_error
-# 功能: ERR 信号回调,在 set -e 触发退出前打印出错位置与退出码
-# 参数: 无(由 trap 自动注入)
-# 返回值: 以原退出码退出
-# ------------------------------------------------------------------------------
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败,退出码:${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-# ------------------------------------------------------------------------------
-# 函数: read_prompt
-# 功能: 读取用户输入到指定变量名,兼容管道与无 TTY 环境
-# 参数: $1 - 提示文本, $2 - 用于存放输入的变量名
-# 返回值: 0 - 读取成功, 非 0 - EOF 或读取失败
-# ------------------------------------------------------------------------------
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-# ------------------------------------------------------------------------------
-# 函数: command_exists
-# 功能: 检查指定命令是否在 PATH 中可用
-# 参数: $1 - 命令名
-# 返回值: 0 - 存在, 非 0 - 不存在
-# ------------------------------------------------------------------------------
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
 
 # ------------------------------------------------------------------------------
 # 函数: usage
@@ -396,8 +288,6 @@ do_disable() {
 # 返回值: 透传子命令的退出码
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=../load_common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "bbr" "另一个 bbr 实例正在运行,请等待其完成后再试。" || return 1
   print_banner
   local args=()

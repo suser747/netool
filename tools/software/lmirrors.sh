@@ -31,26 +31,6 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
-## 项目兼容层：标准日志函数（供 netool懒人工具箱 调用时使用，不影响脚本自身输出函数）
-COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m' COLOR_GREEN=$'\033[32m' COLOR_YELLOW=$'\033[33m'
-  COLOR_CYAN=$'\033[36m' COLOR_BOLD=$'\033[1m' COLOR_RESET=$'\033[0m'
-fi
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
-  COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""
-fi
-log_info()    { printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-log_success() { printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-log_warn()    { printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-log_error()   { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-trap on_error ERR
 
 ## 定制方法
 # 只需要在头部（此处）定义全局变量即可，具体详见官网文档，简单写几个例子
@@ -469,7 +449,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    USE_OFFICIAL_SOURCE="${2,,}"
+                    USE_OFFICIAL_SOURCE="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -485,7 +465,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    USE_OFFICIAL_SOURCE_EPEL="${2,,}"
+                    USE_OFFICIAL_SOURCE_EPEL="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -501,7 +481,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    USE_INTRANET_SOURCE="${2,,}"
+                    USE_INTRANET_SOURCE="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -517,7 +497,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 http | https | HTTP | HTTPS)
-                    WEB_PROTOCOL="${2,,}"
+                    WEB_PROTOCOL="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -533,7 +513,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    INSTALL_EPEL="${2,,}"
+                    INSTALL_EPEL="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -553,7 +533,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    BACKUP="${2,,}"
+                    BACKUP="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -573,7 +553,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    UPGRADE_SOFTWARE="${2,,}"
+                    UPGRADE_SOFTWARE="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -589,7 +569,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    CLEAN_CACHE="${2,,}"
+                    CLEAN_CACHE="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -604,7 +584,7 @@ function handle_command_options() {
         --lang)
             if [ "$2" ]; then
                 local lang_norm="${2//_/-}"
-                lang_norm="${lang_norm,,}"
+                lang_norm="$(tolower "lang_norm")"
                 case "$lang_norm" in
                 zh | zh-cn | zh-hans | zh-hans-*)
                     init_msg_pack "zh-hans"
@@ -644,7 +624,7 @@ function handle_command_options() {
             if [ "$2" ]; then
                 case "$2" in
                 [Tt]rue | [Ff]alse)
-                    CLEAN_SCREEN="${2,,}"
+                    CLEAN_SCREEN="$(tolower "${2}")"
                     shift
                     ;;
                 *)
@@ -898,7 +878,7 @@ function collect_system_info() {
             ## https://codeberg.org/gioele/lsb-release-minimal
             SYSTEM_JUDGMENT="${SYSTEM_ID^}"
             if [ "${SYSTEM_NAME}" ]; then
-                if [[ "${SYSTEM_ID,,}" == "${SYSTEM_NAME,,}" ]]; then
+                if [[ "$(tolower "SYSTEM_ID")" == "$(tolower "SYSTEM_NAME")" ]]; then
                     SYSTEM_JUDGMENT="${SYSTEM_NAME}"
                 fi
             fi
@@ -1068,7 +1048,7 @@ function collect_system_info() {
     ## 定义软件源仓库名称
     if [[ -z "${SOURCE_BRANCH}" ]]; then
         ## 默认为系统名称小写，替换空格
-        SOURCE_BRANCH="${SYSTEM_JUDGMENT,,}"
+        SOURCE_BRANCH="$(tolower "SYSTEM_JUDGMENT")"
         SOURCE_BRANCH="${SOURCE_BRANCH// /-}"
         ## 处理特殊的仓库名称
         case "${SYSTEM_JUDGMENT}" in
@@ -1147,7 +1127,7 @@ function collect_system_info() {
         "${SYSTEM_OPENCLOUDOS}")
             # OpenCloudOS Stream
             if grep -q "${SYSTEM_OPENCLOUDOS_STREAM}" $File_OpenCloudOSRelease; then
-                SOURCE_BRANCH="${SYSTEM_OPENCLOUDOS_STREAM,,}"
+                SOURCE_BRANCH="$(tolower "SYSTEM_OPENCLOUDOS_STREAM")"
                 SOURCE_BRANCH="${SOURCE_BRANCH// /-}"
             fi
             ;;
@@ -1476,7 +1456,7 @@ function choose_protocol() {
             fi
         fi
     fi
-    WEB_PROTOCOL="${WEB_PROTOCOL,,}"
+    WEB_PROTOCOL="$(tolower "WEB_PROTOCOL")"
 }
 
 # 选择安装/换源 EPEL 附加软件包（适用于部分红帽系统）
@@ -2335,7 +2315,7 @@ $(gen_deb "${1}" "${2}-security" "${3}")"
 URIs: ${WEB_PROTOCOL}://${2}/
 Suites: ${3}
 Components: ${4}
-Signed-By: /usr/share/keyrings/${_DEB22_ARCHIVE_KEYRING:-"${SYSTEM_JUDGMENT,,}-archive-keyring.gpg"}"
+Signed-By: /usr/share/keyrings/${_DEB22_ARCHIVE_KEYRING:-"$(tolower "SYSTEM_JUDGMENT")-archive-keyring.gpg"}"
     }
     function gen_deb822() {
         echo "$(_template_deb822 "deb" "${1}" "${2}" "${3}")
@@ -8269,7 +8249,7 @@ function init_msg_pack() {
     }
     local current_lang="${1:-${MESSAGE_LANG_DEFAULT}}"
     current_lang="$(echo "${current_lang}" | sed 's/^-*//')"
-    current_lang="${current_lang,,}"
+    current_lang="$(tolower "current_lang")"
     if [[ "${MESSAGE_LANG_DISPLAY[${current_lang}]}" ]]; then
         current_lang="${current_lang//-/_}"
         load_pack "msg_pack_${current_lang}"
