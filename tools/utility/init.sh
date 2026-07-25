@@ -17,9 +17,11 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="server-init"
 SCRIPT_VERSION="1.0"
-
-# 主入口脚本路径，由 main() 在运行时根据脚本位置赋值，供 run_tool 调用子工具
 MAIN_SH=""
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
+trap on_error ERR
 
 # ---------- 颜色定义 ----------
 # 默认禁用颜色，仅当标准输出为终端时启用，避免日志归档时混入转义序列
@@ -107,7 +109,7 @@ audit_log() {
     return 0
   fi
 
-  local log_dir="/var/log/ayu-toolbox"
+  local log_dir="/var/log/netool"
   mkdir -p "$log_dir" 2>/dev/null || return 0
   chmod 700 "$log_dir" 2>/dev/null || true
 
@@ -160,7 +162,7 @@ confirm_default_no() {
   local reply=""
   if ! read_prompt "(y/n) [默认: n]: " reply; then reply="n"; fi
   reply="${reply:-n}"
-  case "${reply,,}" in
+  case "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "reply")" in
     y|yes|是|确认) return 0 ;;
     *) return 1 ;;
   esac
@@ -254,7 +256,7 @@ main() {
     exit 1
   fi
   go="${go:-n}"
-  case "${go,,}" in
+  case "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "go")" in
     y|yes|是|确认) ;;
     *) log_info "已取消。"; exit 0 ;;
   esac
@@ -277,14 +279,14 @@ main() {
   printf "\n"
   if ! read_prompt "是否切换软件源？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 3 步：软件源切换 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     log_info "轻量换源（带备份恢复）：mirror"
     log_info "全能换源（更多发行版+Docker）：lmirrors"
     local choice=""
     if ! read_prompt "请选择 (mirror/lmirrors/n) [默认: mirror]: " choice; then choice="mirror"; fi
     choice="${choice:-mirror}"
-    case "${choice,,}" in
+    case "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "choice")" in
       lmirrors|全能) run_tool lmirrors ;;
       n|no|否|不) log_info "已跳过。" ;;
       *) run_tool mirror ;;
@@ -295,13 +297,13 @@ main() {
 
   if ! read_prompt "是否安装基础工具？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 4 步：基础工具安装 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     run_tool basic --plan
     local inst=""
     if ! read_prompt "确认执行安装？(y/n) [默认: n]: " inst; then inst="n"; fi
     inst="${inst:-n}"
-    if [[ "${inst,,}" == "y" || "${inst,,}" == "是" ]]; then
+    if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "inst")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "inst")" == "是" ]]; then
       run_tool basic -y
       audit_log "init_wizard" "basic_install done"
     else
@@ -313,13 +315,13 @@ main() {
 
   if ! read_prompt "是否启用 BBR？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 5 步：BBR 网络优化 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     run_tool bbr status
     local bbr_go=""
     if ! read_prompt "确认启用 BBR？(y/n) [默认: n]: " bbr_go; then bbr_go="n"; fi
     bbr_go="${bbr_go:-n}"
-    if [[ "${bbr_go,,}" == "y" || "${bbr_go,,}" == "是" ]]; then
+    if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "bbr_go")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "bbr_go")" == "是" ]]; then
       run_tool bbr enable -y
       audit_log "init_wizard" "bbr_enable done"
     else
@@ -331,7 +333,7 @@ main() {
 
   if ! read_prompt "是否设置主机名/时区？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 6 步：主机名/时区 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     run_tool host
     audit_log "init_wizard" "host done"
@@ -341,7 +343,7 @@ main() {
 
   if ! read_prompt "是否修改 SSH 端口？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 7 步：SSH 端口管理 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     run_tool ssh
     audit_log "init_wizard" "ssh done"
@@ -351,13 +353,13 @@ main() {
 
   if ! read_prompt "是否安装 Docker？(y/n) [默认: n]: " step; then step="n"; fi
   step="${step:-n}"
-  if [[ "${step,,}" == "y" || "${step,,}" == "是" ]]; then
+  if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "step")" == "是" ]]; then
     printf "\n%s--- 第 8 步：Docker 安装 ---%s\n" "$COLOR_BLUE" "$COLOR_RESET"
     run_tool docker install --plan
     local dk=""
     if ! read_prompt "确认安装 Docker？(y/n) [默认: n]: " dk; then dk="n"; fi
     dk="${dk:-n}"
-    if [[ "${dk,,}" == "y" || "${dk,,}" == "是" ]]; then
+    if [[ "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "dk")" == "y" || "20 20 12 61 79 80 81 33 98 100 204 250 395 398 399 400 701tolower "dk")" == "是" ]]; then
       run_tool docker install -y
       audit_log "init_wizard" "docker_install done"
     else

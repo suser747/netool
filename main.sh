@@ -4,7 +4,7 @@
 # =============================================================================
 # 项目名称: netool懒人工具箱 (netool)
 # 脚本名称: main
-# 脚本版本: 2.0
+# 脚本版本: 2.1
 # 项目地址: https://gitee.com/suser747/netool
 #
 # 功能说明:
@@ -15,7 +15,7 @@
 # 使用方式:
 #   交互式菜单:  bash main.sh
 #   参数式调用:  bash main.sh <工具名> [参数...]
-#   远程执行:    bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) <工具名>
+#   远程执行:    bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) <工具名>
 #
 # 标准参数:
 #   --help       显示帮助信息
@@ -34,14 +34,14 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="netool"
-SCRIPT_VERSION="2.0"
+SCRIPT_VERSION="2.1"
 REPO_URL="https://gitee.com/suser747/netool"
-SCRIPT_URL="https://gitee.com/suser747/netool/raw/m/i"
-SHORT_SCRIPT_URL="https://gitee.com/suser747/netool/raw/m/i"
-RAW_BASE_URL="https://gitee.com/suser747/netool/raw/main"
-AGREEMENT_URL="https://gitee.com/suser747/netool/blob/main/USER_AGREEMENT.md"
+SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
+SHORT_SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
+RAW_BASE_URL="https://gitee.com/suser747/netool/raw/master"
+AGREEMENT_URL="https://gitee.com/suser747/netool/blob/master/USER_AGREEMENT.md"
 LICENSE_VERSION="1"
-LOG_DIR="/var/log/ayu-toolbox"
+LOG_DIR="/var/log/netool"
 EXIT_OK=0
 EXIT_ERROR=1
 EXIT_USAGE=2
@@ -54,6 +54,31 @@ if [[ -n "$SCRIPT_SOURCE" && "$SCRIPT_SOURCE" != "bash" && "$SCRIPT_SOURCE" != "
 else
   SCRIPT_DIR="$(pwd)"
 fi
+
+NETOOL_BOOTSTRAP_DIR=""
+if [[ -f "${SCRIPT_DIR}/tools/common.sh" ]]; then
+  # shellcheck source=tools/common.sh
+  source "${SCRIPT_DIR}/tools/common.sh"
+elif command -v curl >/dev/null 2>&1; then
+  NETOOL_BOOTSTRAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/netool-bootstrap.XXXXXX" 2>/dev/null || mktemp -d)"
+  mkdir -p "${NETOOL_BOOTSTRAP_DIR}/tools"
+  if curl -fsSL "${RAW_BASE_URL:-https://gitee.com/suser747/netool/raw/master}/tools/common.sh" \
+    -o "${NETOOL_BOOTSTRAP_DIR}/tools/common.sh" 2>/dev/null \
+    && bash -n "${NETOOL_BOOTSTRAP_DIR}/tools/common.sh" 2>/dev/null; then
+    # shellcheck source=/dev/null
+    source "${NETOOL_BOOTSTRAP_DIR}/tools/common.sh"
+  else
+    rm -rf "$NETOOL_BOOTSTRAP_DIR"
+    NETOOL_BOOTSTRAP_DIR=""
+    printf '[错误] 无法加载 tools/common.sh，且远程下载失败。请检查网络或改用本地部署。\n' >&2
+    exit 1
+  fi
+else
+  printf '[错误] 缺少 tools/common.sh，且未安装 curl 无法远程下载。\n' >&2
+  exit 1
+fi
+trap on_error ERR
+
 TOOL_EXIT_CODE=0
 SELECTED_ACTION=""
 SELECTED_TOOL=""
@@ -78,24 +103,6 @@ setup_locale() {
 ORIG_LANG="${LANG:-}"
 ORIG_LC_ALL="${LC_ALL:-}"
 ORIG_LC_CTYPE="${LC_CTYPE:-}"
-
-COLOR_RED=""
-COLOR_GREEN=""
-COLOR_YELLOW=""
-COLOR_BLUE=""
-COLOR_CYAN=""
-COLOR_BOLD=""
-COLOR_RESET=""
-
-if [[ -t 1 ]]; then
-  COLOR_RED=$'\033[31m'
-  COLOR_GREEN=$'\033[32m'
-  COLOR_YELLOW=$'\033[33m'
-  COLOR_BLUE=$'\033[34m'
-  COLOR_CYAN=$'\033[36m'
-  COLOR_BOLD=$'\033[1m'
-  COLOR_RESET=$'\033[0m'
-fi
 
 setup_locale
 
@@ -183,199 +190,47 @@ detect_os() {
 
 check_display_env() {
   detect_os
-  
-  local encoding_ok=0
-  local has_zh_locale=0
-  local has_font=0
-  
+
+  local encoding_ok=0 has_zh_locale=0 need_tip=0
+
   if [[ "${LANG:-}" == *UTF-8* || "${LANG:-}" == *utf-8* || "${LC_ALL:-}" == *UTF-8* || "${LC_ALL:-}" == *utf-8* || "${LC_CTYPE:-}" == *UTF-8* || "${LC_CTYPE:-}" == *utf-8* ]]; then
     encoding_ok=1
   fi
-  
+
   if [[ "${LANG:-}" == zh_* || "${LC_ALL:-}" == zh_* || "${LC_CTYPE:-}" == zh_* ]]; then
     has_zh_locale=1
   fi
-  
-  local font_found=0
-  if command -v fc-list >/dev/null 2>&1; then
-    if fc-list :lang=zh 2>/dev/null | grep -q .; then
-      font_found=1
-    fi
+
+  if (( encoding_ok == 0 || has_zh_locale == 0 )); then
+    need_tip=1
   fi
-  
-  if (( font_found == 0 )); then
-    local font_dirs="/usr/share/fonts /usr/local/share/fonts /usr/X11R6/lib/X11/fonts"
-    for dir in $font_dirs; do
-      if [[ -d "$dir" ]]; then
-        if find "$dir" -type f \( -iname '*wqy*' -o -iname '*noto*cjk*' -o -iname '*wenquanyi*' -o -iname '*simhei*' -o -iname '*simsun*' -o -iname '*cjk*' \) 2>/dev/null | grep -q .; then
-          font_found=1
-          break
-        fi
-      fi
-    done
-  fi
-  
-  if (( font_found == 1 )); then
-    has_font=1
-  fi
-  
-  printf "%s%s[Tip]%s Chinese display fix guide:\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" >&2
-  
+
+  (( need_tip == 0 )) && return 0
+
+  printf "%s%s[Tip]%s 中文显示修复建议：\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" >&2
+
   if (( encoding_ok == 0 )); then
-    printf "       [Encoding] Not UTF-8. Original LANG: %s\n" "$ORIG_LANG" >&2
+    printf "       [编码] 当前非 UTF-8，原始 LANG=%s\n" "$ORIG_LANG" >&2
   fi
-  
+
   if (( has_zh_locale == 0 )); then
     local locale_available=0
-    if command -v locale >/dev/null 2>&1; then
-      if locale -a 2>/dev/null | grep -qiE 'zh_CN.*utf-?8'; then
-        locale_available=1
-      fi
+    if command -v locale >/dev/null 2>&1 && locale -a 2>/dev/null | grep -qiE 'zh_CN.*utf-?8'; then
+      locale_available=1
     fi
-    
-    printf "       [Locale]   " >&2
+    printf "       [区域] " >&2
     if (( locale_available == 1 )); then
-      printf "Run: export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8\n" >&2
+      printf "export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8\n" >&2
     else
-      printf "Install zh_CN.UTF-8 first:\n" >&2
-      
-      case "$OS_FAMILY" in
-        debian)
-          printf "                  sudo apt install -y locales\n" >&2
-          printf "                  sudo locale-gen zh_CN.utf8\n" >&2
-          if [[ "$OS_ID" == ubuntu && -n "$OS_VERSION_MAJOR" && "$OS_VERSION_MAJOR" =~ ^[0-9]+$ && "$OS_VERSION_MAJOR" -ge 22 ]]; then
-            printf "                  sudo update-locale LANG=zh_CN.UTF-8\n" >&2
-          else
-            printf "                  echo 'LANG=zh_CN.UTF-8' | sudo tee /etc/default/locale\n" >&2
-          fi
-          ;;
-        rhel)
-          if [[ "$OS_PACKAGE_MANAGER" == dnf ]]; then
-            printf "                  sudo dnf install -y glibc-langpack-zh\n" >&2
-          else
-            printf "                  sudo yum install -y glibc-langpack-zh\n" >&2
-          fi
-          if [[ -n "$OS_VERSION_MAJOR" && "$OS_VERSION_MAJOR" =~ ^[0-9]+$ && "$OS_VERSION_MAJOR" -ge 8 ]]; then
-            printf "                  sudo localectl set-locale LANG=zh_CN.UTF-8\n" >&2
-          else
-            printf "                  echo 'LANG=zh_CN.UTF-8' | sudo tee /etc/locale.conf\n" >&2
-          fi
-          ;;
-        arch)
-          printf "                  sudo sed -i '/zh_CN.UTF-8/s/^# //' /etc/locale.gen\n" >&2
-          printf "                  sudo locale-gen\n" >&2
-          printf "                  echo 'LANG=zh_CN.UTF-8' | sudo tee /etc/locale.conf\n" >&2
-          ;;
-        alpine)
-          printf "                  sudo apk add ttf-wqy-microhei\n" >&2
-          printf "                  sudo setup-locale LANG=zh_CN.UTF-8\n" >&2
-          ;;
-        *)
-          printf "                  Debian/Ubuntu: sudo apt install -y locales && sudo locale-gen zh_CN.utf8\n" >&2
-          printf "                  CentOS/RHEL:    sudo yum install -y glibc-langpack-zh\n" >&2
-          ;;
-      esac
+      printf "请先安装 zh_CN.UTF-8 locale\n" >&2
     fi
   fi
-  
-  printf "       [Font]     Install Chinese fonts:\n" >&2
-  case "$OS_FAMILY" in
-    debian)
-      if [[ "$OS_ID" == ubuntu ]]; then
-        if [[ -n "$OS_VERSION_MAJOR" && "$OS_VERSION_MAJOR" =~ ^[0-9]+$ && "$OS_VERSION_MAJOR" -ge 22 ]]; then
-          printf "                  sudo apt install -y fonts-noto-cjk\n" >&2
-        else
-          printf "                  sudo apt install -y fonts-wqy-zenhei fonts-wqy-microhei\n" >&2
-        fi
-      elif [[ "$OS_ID" == debian ]]; then
-        if [[ -n "$OS_VERSION_MAJOR" && "$OS_VERSION_MAJOR" =~ ^[0-9]+$ && "$OS_VERSION_MAJOR" -ge 12 ]]; then
-          printf "                  sudo apt install -y fonts-noto-cjk\n" >&2
-        else
-          printf "                  sudo apt install -y fonts-wqy-zenhei fonts-wqy-microhei\n" >&2
-        fi
-      else
-        printf "                  sudo apt install -y fonts-wqy-zenhei fonts-wqy-microhei\n" >&2
-      fi
-      ;;
-    rhel)
-      if [[ "$OS_PACKAGE_MANAGER" == dnf ]]; then
-        printf "                  sudo dnf install -y wqy-zenhei-fonts wqy-microhei-fonts\n" >&2
-      else
-        printf "                  sudo yum install -y wqy-zenhei-fonts wqy-microhei-fonts\n" >&2
-      fi
-      ;;
-    arch)
-      printf "                  sudo pacman -Sy ttf-wqy-microhei ttf-wqy-zenhei\n" >&2
-      ;;
-    alpine)
-      printf "                  sudo apk add ttf-wqy-microhei\n" >&2
-      ;;
-    *)
-      printf "                  Debian/Ubuntu: sudo apt install -y fonts-wqy-zenhei\n" >&2
-      printf "                  CentOS/RHEL:    sudo yum install -y wqy-zenhei-fonts\n" >&2
-      ;;
-  esac
-  
-  printf "\n                  After installation, reconnect your SSH terminal\n" >&2
-  printf "                  Or run: export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8\n\n" >&2
-  sleep 3
+
+  printf "       [字体] 可安装中文字体：fonts-wqy-zenhei 或 fonts-noto-cjk\n" >&2
+  printf "       安装后重连 SSH，或执行 export LANG=zh_CN.UTF-8\n\n" >&2
 }
 
 check_display_env
-
-log_info() { (( QUIET == 1 )) || printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
-log_success() { (( QUIET == 1 )) || printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
-log_warn() { (( QUIET == 1 )) || printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET" "$*"; }
-log_error() { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
-die() { log_error "$*"; exit "$EXIT_ERROR"; }
-
-read_prompt() {
-  local prompt="$1"
-  local var_name="$2"
-  local value=""
-
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
-    if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
-      return 0
-    fi
-  fi
-
-  printf "%s" "$prompt"
-  IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
-}
-
-audit_log() {
-  local action="$1"
-  shift || true
-  local detail="$*"
-
-  if ! is_root_user; then
-    return 0
-  fi
-
-  mkdir -p "$LOG_DIR" 2>/dev/null || return 0
-  chmod 700 "$LOG_DIR" 2>/dev/null || true
-
-  local log_file="${LOG_DIR}/audit.log"
-  local timestamp
-  timestamp="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown)"
-  local user="${USER:-$(whoami 2>/dev/null || echo unknown)}"
-
-  printf "[%s] user=%s action=%s detail=%s\n" "$timestamp" "$user" "$action" "$detail" >>"$log_file" 2>/dev/null || true
-  chmod 600 "$log_file" 2>/dev/null || true
-}
-
-on_error() {
-  local exit_code=$?
-  log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
-print_divider() { printf "%s%s%s\n" "$COLOR_CYAN" "------------------------------------------------------------" "$COLOR_RESET"; }
 
 print_banner() {
   printf "%s" "$COLOR_CYAN"
@@ -396,22 +251,14 @@ print_section() {
   printf "%s%s----------------------%s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET"
 }
 
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-is_root_user() {
-  [[ ${EUID:-$(id -u 2>/dev/null || echo 1)} -eq 0 ]]
-}
-
 confirm_license() {
-  if [[ -n "${AYU_SKIP_LICENSE:-}" || $# -gt 0 ]]; then
+  if [[ -n "${NETOOL_SKIP_LICENSE:-${AYU_SKIP_LICENSE:-}}" || $# -gt 0 ]]; then
     return 0
   fi
 
   local agreed=""
-  local config_dir="${XDG_CONFIG_HOME:-${HOME:-}/.config}/ayu-toolbox"
-  local license_file="${config_dir}/license-v${LICENSE_VERSION}.accepted"
+  local license_file
+  license_file="$(netool_license_file "$LICENSE_VERSION")"
 
   if [[ -n "${HOME:-}" && -f "$license_file" ]]; then
     return 0
@@ -424,11 +271,11 @@ confirm_license() {
     die "无法读取许可确认。"
   fi
 
-  case "${agreed,,}" in
+  case "$(tolower "$agreed")" in
     y|yes|同意|确认)
       if [[ -n "${HOME:-}" ]]; then
-        mkdir -p "$config_dir" 2>/dev/null || true
-        printf "accepted_at=%s\nversion=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date 2>/dev/null || echo unknown)" "$LICENSE_VERSION" >"$license_file" 2>/dev/null || true
+        mkdir -p "$NETOOL_CONFIG_DIR" 2>/dev/null || true
+        printf "accepted_at=%s\nversion=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date 2>/dev/null || echo unknown)" "$LICENSE_VERSION" >"$(netool_license_file "$LICENSE_VERSION")" 2>/dev/null || true
       fi
       return 0
       ;;
@@ -607,34 +454,80 @@ netool懒人工具箱 v${SCRIPT_VERSION}
   直接运行不带工具名时进入菜单选择。
   传入工具名时，后续参数原样转交给对应脚本。
   本地部署时无需 curl，直接运行 main.sh 即可。
+  远程 curl 一键运行详见 REMOTE_USAGE.md。
   两个换源工具区别：mirror 轻量带备份；lmirrors 功能全支持更多发行版+Docker。
 EOF
 }
 
 list_tools() {
-  cat <<EOF
-${COLOR_BOLD}${COLOR_CYAN}系统查看${COLOR_RESET}  1系统信息  11时间用户  12运行服务  23主机时区  25进程服务  35磁盘占用
-${COLOR_BOLD}${COLOR_CYAN}系统维护${COLOR_RESET}  2系统更新  3系统清理  17基础工具  20Swap  30日志清理  33时间同步
-${COLOR_BOLD}${COLOR_CYAN}网络工具${COLOR_RESET}  6网络端口  13DNS测试  14Ping测试  19性能测试
-${COLOR_BOLD}${COLOR_CYAN}网络配置${COLOR_RESET}  4SSH管理  18BBR优化  21防火墙  34证书检查
-${COLOR_BOLD}${COLOR_CYAN}Docker  ${COLOR_RESET}  5Docker状态  16Docker资源  22Docker安装
-${COLOR_BOLD}${COLOR_CYAN}磁盘硬件${COLOR_RESET}  7磁盘管理  8验盘检测  9盘位映射  10SMART长测
-${COLOR_BOLD}${COLOR_CYAN}用户安全${COLOR_RESET}  24Fail2ban  31用户管理  32定时任务
-${COLOR_BOLD}${COLOR_CYAN}软件源  ${COLOR_RESET}  15轻量换源  26Homebrew  27全能换源
-${COLOR_BOLD}${COLOR_CYAN}快捷工具${COLOR_RESET}  28初始化向导  29卸载工具箱
-${COLOR_BOLD}${COLOR_CYAN}其他    ${COLOR_RESET}  ${COLOR_YELLOW}01功能检查${COLOR_RESET}  ${COLOR_YELLOW}00更新${COLOR_RESET}  ${COLOR_YELLOW}0退出${COLOR_RESET}
+  local b="${COLOR_BOLD}${COLOR_CYAN}"
+  local r="${COLOR_RESET}"
+  local y="${COLOR_YELLOW}"
 
-${COLOR_YELLOW}提示${COLOR_RESET}  不确定选01; 高风险操作会再次确认; 15轻量换源带备份; 27全能换源支持更多发行版+Docker。
-EOF
+  _menu_row() {
+    if [[ -n "${3:-}" ]]; then
+      printf "  ${b}[%2s]${r} %-10s    ${b}[%2s]${r} %s\n" "$1" "$2" "$3" "$4"
+    else
+      printf "  ${b}[%2s]${r} %s\n" "$1" "$2"
+    fi
+  }
+
+  _menu_section() {
+    printf "\n%s── %s %s\n" "$b" "$1" "$r"
+  }
+
+  _menu_section "系统查看"
+  _menu_row "1"  "系统信息"   "11" "时间/用户"
+  _menu_row "12" "运行服务"   "23" "主机/时区"
+  _menu_row "25" "进程/服务"  "35" "磁盘占用"
+
+  _menu_section "系统维护"
+  _menu_row "2"  "系统更新*"  "3"  "系统清理*"
+  _menu_row "17" "基础工具"   "20" "Swap 管理"
+  _menu_row "30" "日志清理"   "33" "时间同步"
+
+  _menu_section "网络"
+  _menu_row "6"  "网络端口"   "13" "DNS 测试"
+  _menu_row "14" "Ping 测试"  "19" "性能测试"
+  _menu_row "4"  "SSH 管理"   "18" "BBR 优化"
+  _menu_row "21" "防火墙"     "34" "证书检查"
+
+  _menu_section "Docker"
+  _menu_row "5"  "容器状态"   "16" "镜像/卷/网络"
+  _menu_row "22" "安装 Docker"
+
+  _menu_section "磁盘硬件"
+  _menu_row "7"  "磁盘管理"   "9"  "盘位映射"
+  _menu_row "8"  "验盘检测!"  "10" "SMART 长测"
+
+  _menu_section "用户安全"
+  _menu_row "24" "Fail2ban"   "31" "用户管理"
+  _menu_row "32" "定时任务"
+
+  _menu_section "软件源"
+  _menu_row "15" "轻量换源"   "26" "Homebrew"
+  _menu_row "27" "全能换源"
+
+  _menu_section "快捷工具"
+  _menu_row "28" "初始化向导" "29" "卸载工具箱"
+
+  _menu_section "其他"
+  printf "  ${y}[%2s]${r} 功能检查       ${y}[%2s]${r} 更新脚本\n" "01" "00"
+  printf "  ${y}[%2s]${r} 退出\n" "0"
+
+  printf "\n"
+  printf "%s说明:${r} *仅提示命令  !毁数据  不确定请先输入 ${b}01${r}\n" "$y"
 }
 
 resolve_selection() {
   local input="${1:-}"
+  local input_lower
+  input_lower="$(tolower "$input")"
   SELECTED_ACTION="tool"
   SELECTED_TOOL=""
   SELECTED_ARGS=()
 
-  case "${input,,}" in
+  case "$input_lower" in
     1|system|sys|status|info|系统|系统信息|系统工具)
       SELECTED_TOOL="system"
       SELECTED_ARGS=(info)
@@ -771,33 +664,85 @@ resolve_selection() {
   return 0
 }
 
-tool_script_url() {
+tool_rel_path() {
   case "$1" in
-    system) printf "%s/tools/system/system.sh\n" "$RAW_BASE_URL" ;;
-    network) printf "%s/tools/network/network.sh\n" "$RAW_BASE_URL" ;;
-    docker) printf "%s/tools/docker/docker.sh\n" "$RAW_BASE_URL" ;;
-    basic) printf "%s/tools/software/basic.sh\n" "$RAW_BASE_URL" ;;
-    host) printf "%s/tools/system/host.sh\n" "$RAW_BASE_URL" ;;
-    swap) printf "%s/tools/system/swap.sh\n" "$RAW_BASE_URL" ;;
-    firewall) printf "%s/tools/security/firewall.sh\n" "$RAW_BASE_URL" ;;
-    security) printf "%s/tools/security/security.sh\n" "$RAW_BASE_URL" ;;
-    service) printf "%s/tools/system/service.sh\n" "$RAW_BASE_URL" ;;
-    bbr) printf "%s/tools/network/bbr.sh\n" "$RAW_BASE_URL" ;;
-    bench) printf "%s/tools/network/bench.sh\n" "$RAW_BASE_URL" ;;
-    mirror) printf "%s/tools/software/mirror.sh\n" "$RAW_BASE_URL" ;;
-    ssh) printf "%s/tools/network/ssh-port.sh\n" "$RAW_BASE_URL" ;;
-    disk) printf "%s/tools/disk/disk.sh\n" "$RAW_BASE_URL" ;;
-    homebrew) printf "%s/tools/software/homebrew.sh\n" "$RAW_BASE_URL" ;;
-    lmirrors) printf "%s/tools/software/lmirrors.sh\n" "$RAW_BASE_URL" ;;
-    init) printf "%s/tools/utility/init.sh\n" "$RAW_BASE_URL" ;;
-    logclean) printf "%s/tools/system/logclean.sh\n" "$RAW_BASE_URL" ;;
-    user) printf "%s/tools/security/user.sh\n" "$RAW_BASE_URL" ;;
-    cron) printf "%s/tools/security/cron.sh\n" "$RAW_BASE_URL" ;;
-    ssl-check) printf "%s/tools/network/ssl-check.sh\n" "$RAW_BASE_URL" ;;
-    ntp) printf "%s/tools/system/ntp.sh\n" "$RAW_BASE_URL" ;;
-    du-analyze) printf "%s/tools/disk/du-analyze.sh\n" "$RAW_BASE_URL" ;;
+    system) printf "tools/system/system.sh" ;;
+    network) printf "tools/network/network.sh" ;;
+    docker) printf "tools/docker/docker.sh" ;;
+    basic) printf "tools/software/basic.sh" ;;
+    host) printf "tools/system/host.sh" ;;
+    swap) printf "tools/system/swap.sh" ;;
+    firewall) printf "tools/security/firewall.sh" ;;
+    security) printf "tools/security/security.sh" ;;
+    service) printf "tools/system/service.sh" ;;
+    bbr) printf "tools/network/bbr.sh" ;;
+    bench) printf "tools/network/bench.sh" ;;
+    mirror) printf "tools/software/mirror.sh" ;;
+    ssh) printf "tools/network/ssh-port.sh" ;;
+    disk) printf "tools/disk/disk.sh" ;;
+    homebrew) printf "tools/software/homebrew.sh" ;;
+    lmirrors) printf "tools/software/lmirrors.sh" ;;
+    init) printf "tools/utility/init.sh" ;;
+    logclean) printf "tools/system/logclean.sh" ;;
+    user) printf "tools/security/user.sh" ;;
+    cron) printf "tools/security/cron.sh" ;;
+    ssl-check) printf "tools/network/ssl-check.sh" ;;
+    ntp) printf "tools/system/ntp.sh" ;;
+    du-analyze) printf "tools/disk/du-analyze.sh" ;;
     *) return 1 ;;
   esac
+}
+
+tool_script_url() {
+  local rel=""
+  rel="$(tool_rel_path "$1")" || return 1
+  printf "%s/%s" "$RAW_BASE_URL" "$rel"
+}
+
+is_local_deploy() {
+  [[ -f "${SCRIPT_DIR}/main.sh" && -d "${SCRIPT_DIR}/tools" ]]
+}
+
+fetch_remote_file() {
+  local rel_path="$1"
+  local dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  if ! curl -fsSL "${RAW_BASE_URL}/${rel_path}" -o "$dest"; then
+    log_error "下载失败：${RAW_BASE_URL}/${rel_path}"
+    return 1
+  fi
+  if ! validate_bash_script "$dest"; then
+    log_error "远程脚本语法校验失败：${rel_path}"
+    return 1
+  fi
+  chmod 700 "$dest"
+  return 0
+}
+
+patch_remote_script() {
+  local script_file="$1"
+  local patched="${script_file}.patched"
+  {
+    head -1 "$script_file"
+    printf '%s\n' ': # netool-remote-bootstrap'
+    printf '%s\n' 'if [[ -n "${NETOOL_COMMON_FILE:-}" && -f "$NETOOL_COMMON_FILE" && -z "${NETOOL_COMMON_SOURCED:-}" ]]; then # shellcheck source=/dev/null'
+    printf '%s\n' '  source "$NETOOL_COMMON_FILE"'
+    printf '%s\n' 'fi'
+    tail -n +2 "$script_file" | sed 's/^[[:space:]]*# shellcheck source=.*common.*$/: # legacy/; s/^[[:space:]]*source.*common\.sh.*/: # legacy common source/'
+  } > "$patched"
+  mv "$patched" "$script_file"
+}
+
+ensure_remote_common() {
+  local tmp_root="$1"
+  local common="${tmp_root}/tools/common.sh"
+  local loader="${tmp_root}/tools/load_common.sh"
+  [[ -f "$common" ]] || fetch_remote_file "tools/common.sh" "$common" || return 1
+  chmod 600 "$common"
+  if [[ ! -f "$loader" ]]; then
+    curl -fsSL "${RAW_BASE_URL}/tools/load_common.sh" -o "$loader" 2>/dev/null && chmod 700 "$loader" || true
+  fi
+  return 0
 }
 
 tool_display_name() {
@@ -838,10 +783,10 @@ run_self_update() {
   fi
 
   if [[ "$origin_url" == *"gitee.com/suser747/netool"* ]]; then
-    log_info "检测到本地 Git 仓库，准备拉取 origin/main。"
-    if ! update_output="$(git -C "$SCRIPT_DIR" pull --ff-only origin main 2>&1)"; then
+    log_info "检测到本地 Git 仓库，准备拉取 origin/master。"
+    if ! update_output="$(git -C "$SCRIPT_DIR" pull --ff-only origin master 2>&1)"; then
       [[ -z "$update_output" ]] || printf "%s\n" "$update_output" >&2
-      log_warn "自动拉取失败，请在仓库目录手动执行：git pull --ff-only origin main"
+      log_warn "自动拉取失败，请在仓库目录手动执行：git pull --ff-only origin master"
       return 1
     fi
     [[ -z "$update_output" ]] || printf "%s\n" "$update_output"
@@ -854,7 +799,7 @@ run_self_update() {
   printf "  在线入口：curl -fsSL %s|bash\n" "$SHORT_SCRIPT_URL"
   printf "\n通过在线入口运行时，每次都会拉取 Gitee 最新短入口，无需手动更新。\n"
   printf "如果你是克隆仓库使用，请在仓库目录执行：\n"
-  printf "  git pull --ff-only origin main\n"
+  printf "  git pull --ff-only origin master\n"
   # 非 git 仓库或远程不匹配时，仅展示更新说明，未实际更新
   return 2
 }
@@ -867,38 +812,14 @@ run_tool() {
   local tool="$1"
   shift || true
 
-  local local_path=""
-  local url=""
-  local tmp_file=""
+  local rel="" local_path="" tmp_root="" target=""
 
-  case "$tool" in
-    system) local_path="${SCRIPT_DIR}/tools/system/system.sh" ;;
-    network) local_path="${SCRIPT_DIR}/tools/network/network.sh" ;;
-    docker) local_path="${SCRIPT_DIR}/tools/docker/docker.sh" ;;
-    basic) local_path="${SCRIPT_DIR}/tools/software/basic.sh" ;;
-    host) local_path="${SCRIPT_DIR}/tools/system/host.sh" ;;
-    swap) local_path="${SCRIPT_DIR}/tools/system/swap.sh" ;;
-    firewall) local_path="${SCRIPT_DIR}/tools/security/firewall.sh" ;;
-    security) local_path="${SCRIPT_DIR}/tools/security/security.sh" ;;
-    service) local_path="${SCRIPT_DIR}/tools/system/service.sh" ;;
-    bbr) local_path="${SCRIPT_DIR}/tools/network/bbr.sh" ;;
-    bench) local_path="${SCRIPT_DIR}/tools/network/bench.sh" ;;
-    mirror) local_path="${SCRIPT_DIR}/tools/software/mirror.sh" ;;
-    ssh) local_path="${SCRIPT_DIR}/tools/network/ssh-port.sh" ;;
-    disk) local_path="${SCRIPT_DIR}/tools/disk/disk.sh" ;;
-    homebrew) local_path="${SCRIPT_DIR}/tools/software/homebrew.sh" ;;
-    lmirrors) local_path="${SCRIPT_DIR}/tools/software/lmirrors.sh" ;;
-    init) local_path="${SCRIPT_DIR}/tools/utility/init.sh" ;;
-    logclean) local_path="${SCRIPT_DIR}/tools/system/logclean.sh" ;;
-    user) local_path="${SCRIPT_DIR}/tools/security/user.sh" ;;
-    cron) local_path="${SCRIPT_DIR}/tools/security/cron.sh" ;;
-    ssl-check) local_path="${SCRIPT_DIR}/tools/network/ssl-check.sh" ;;
-    ntp) local_path="${SCRIPT_DIR}/tools/system/ntp.sh" ;;
-    du-analyze) local_path="${SCRIPT_DIR}/tools/disk/du-analyze.sh" ;;
-  esac
+  rel="$(tool_rel_path "$tool")" || die "未知工具：${tool}"
+  local_path="${SCRIPT_DIR}/${rel}"
 
-  if [[ -n "$local_path" && -f "$local_path" ]]; then
+  if [[ -f "$local_path" ]]; then
     TOOL_EXIT_CODE=0
+    export NETOOL=1
     export AYU_TOOLBOX=1
     if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
       bash "$local_path" "$@" </dev/tty || TOOL_EXIT_CODE=$?
@@ -908,37 +829,40 @@ run_tool() {
     return 0
   fi
 
-  url="$(tool_script_url "$tool")"
-  tmp_file="$(mktemp)"
+  command_exists curl || die "缺少必要命令：curl（远程模式需从 ${RAW_BASE_URL} 下载工具）"
 
-  if ! curl -fsSL "$url" -o "$tmp_file"; then
-    rm -f "$tmp_file"
-    die "下载脚本失败：${url}"
+  tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/netool.XXXXXX" 2>/dev/null || mktemp -d)"
+  target="${tmp_root}/${rel}"
+
+  if ! fetch_remote_file "$rel" "$target"; then
+    rm -rf "$tmp_root"
+    exit "$EXIT_DEPENDENCY"
+  fi
+  patch_remote_script "$target"
+  if ! ensure_remote_common "$tmp_root"; then
+    rm -rf "$tmp_root"
+    exit "$EXIT_DEPENDENCY"
   fi
 
-  chmod 700 "$tmp_file"
-
+  export NETOOL=1
   export AYU_TOOLBOX=1
+  export NETOOL_REMOTE=1
+  export NETOOL_COMMON_FILE="${tmp_root}/tools/common.sh"
 
   TOOL_EXIT_CODE=0
   if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
-    bash "$tmp_file" "$@" </dev/tty || TOOL_EXIT_CODE=$?
+    bash "$target" "$@" </dev/tty || TOOL_EXIT_CODE=$?
   else
-    bash "$tmp_file" "$@" || TOOL_EXIT_CODE=$?
+    bash "$target" "$@" || TOOL_EXIT_CODE=$?
   fi
 
-  rm -f "$tmp_file"
+  rm -rf "$tmp_root"
 }
 
 run_init_wizard() {
   audit_log "init_wizard" "start"
-  export AYU_TOOLBOX=1
-  local rc=0
-  if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
-    bash "$SCRIPT_DIR/tools/utility/init.sh" "$@" </dev/tty || rc=$?
-  else
-    bash "$SCRIPT_DIR/tools/utility/init.sh" "$@" || rc=$?
-  fi
+  run_tool init "$@"
+  local rc=$?
   TOOL_EXIT_CODE=$rc
   if (( rc == 0 )); then
     audit_log "init_wizard" "complete"
@@ -953,8 +877,9 @@ run_uninstall() {
 
   printf "\n%s%s=== 卸载 netool 懒人工具箱 ===%s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET"
   printf "将执行以下操作：\n"
-  printf "  - 删除用户配置：%s~/.config/ayu-toolbox/%s\n" "$COLOR_CYAN" "$COLOR_RESET"
-  printf "  - 删除审计日志：%s%s%s\n" "$COLOR_CYAN" "$LOG_DIR" "$COLOR_RESET"
+  printf "  - 删除用户配置：%s~/.config/netool/%s\n" "$COLOR_CYAN" "$COLOR_RESET"
+  printf "  - 删除审计日志：%s%s%s\n" "$COLOR_CYAN" "$NETOOL_LOG_DIR" "$COLOR_RESET"
+  printf "  - 删除旧版配置：%s~/.config/ayu-toolbox/%s（如存在）\n" "$COLOR_CYAN" "$COLOR_RESET"
   printf "\n%s注意：%s\n" "$COLOR_BOLD" "$COLOR_YELLOW" "$COLOR_RESET"
   printf "  - 不会删除通过工具箱安装的软件（Docker、基础工具等）\n"
   printf "  - 不会恢复修改过的系统配置（SSH端口、BBR、换源、防火墙等）\n"
@@ -967,7 +892,7 @@ run_uninstall() {
     return 0
   fi
 
-  if [[ "${confirm,,}" != "yes" ]]; then
+  if [[ "$(tolower "$confirm")" != "yes" ]]; then
     log_info "未输入 yes，已取消。"
     return 0
   fi
@@ -975,15 +900,13 @@ run_uninstall() {
   audit_log "uninstall" "confirmed"
 
   log_info "正在删除配置文件..."
-  local config_dir="${XDG_CONFIG_HOME:-${HOME:-}/.config}/ayu-toolbox"
-  rm -rf "$config_dir" 2>/dev/null || true
+  rm -rf "$NETOOL_CONFIG_DIR" "$NETOOL_LEGACY_CONFIG_DIR" 2>/dev/null || true
   log_success "配置文件已删除"
 
   if is_root_user; then
-    # 先记录完成日志，再删除日志目录，避免删除后又被 audit_log 重建
     audit_log "uninstall" "complete"
     log_info "正在删除日志目录..."
-    rm -rf "$LOG_DIR" 2>/dev/null || true
+    rm -rf "$NETOOL_LOG_DIR" "$NETOOL_LEGACY_LOG_DIR" 2>/dev/null || true
     log_success "日志目录已删除"
   fi
 
@@ -1031,7 +954,7 @@ interactive_loop() {
           if [[ "$SELECTED_TOOL" == "disk" && "${SELECTED_ARGS[0]:-}" == "full-rw-test" ]]; then
             log_warn "硬盘验盘会全盘写入并清空被测盘。建议先使用 --plan 预览目标。"
           fi
-          run_tool "$SELECTED_TOOL" "${SELECTED_ARGS[@]}"
+          run_tool "$SELECTED_TOOL" ${SELECTED_ARGS[@]+"${SELECTED_ARGS[@]}"}
           ;;
       esac
 
@@ -1102,7 +1025,7 @@ main() {
           exit "$EXIT_OK"
           ;;
         tool)
-          run_tool "$SELECTED_TOOL" "${SELECTED_ARGS[@]}" "$@"
+          run_tool "$SELECTED_TOOL" ${SELECTED_ARGS[@]+"${SELECTED_ARGS[@]}"} "$@"
           ;;
       esac
       exit "$TOOL_EXIT_CODE"

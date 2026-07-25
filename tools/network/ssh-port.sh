@@ -16,7 +16,7 @@
 #   bash ssh-port.sh --port 2222 --mode staged -y
 #   bash ssh-port.sh --port 2222 --mode replace -y
 #   bash ssh-port.sh --restore -y
-#   bash ssh-port.sh --restore-from /var/backups/ssh-port-manager/20260414-153000 -y
+#   bash ssh-port.sh --restore-from /var/backups/netool-ssh-port/20260414-153000 -y
 #   bash ssh-port.sh --list-backups
 #   bash ssh-port.sh -h
 #
@@ -33,7 +33,7 @@ set -Eeuo pipefail
 SCRIPT_NAME="ssh-port-manager"
 SCRIPT_VERSION="2.0"
 REPO_URL="https://gitee.com/suser747/netool"
-SCRIPT_URL="https://gitee.com/suser747/netool/raw/main/tools/ssh-port.sh"
+SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/tools/network/ssh-port.sh"
 BACKUP_ROOT="/var/backups/${SCRIPT_NAME}"
 SSHD_CONFIG="/etc/ssh/sshd_config"
 SSHD_DROPIN_DIR="/etc/ssh/sshd_config.d"
@@ -92,8 +92,8 @@ if [[ -n "${AYU_TOOLBOX:-}" ]]; then
   COLOR_RESET=""
 fi
 
-# shellcheck source=common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
 # ------------------------------------------------------------------------------
 # 函数: log_info
@@ -366,7 +366,7 @@ netool懒人工具箱 | SSH 端口管理 v${SCRIPT_VERSION}
   bash <(curl -fsSL ${SCRIPT_URL}) --port 2222 --mode replace -y
   bash <(curl -fsSL ${SCRIPT_URL}) --restore -y
   bash <(curl -fsSL ${SCRIPT_URL}) --restore-from /var/backups/${SCRIPT_NAME}/20260414-153000 -y
-  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) ssh --port 2222 --mode staged -y
+  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) ssh --port 2222 --mode staged -y
 
 选项:
   --port <n>          指定新端口

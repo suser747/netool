@@ -24,9 +24,12 @@
 #   130 - 用户中断（Ctrl+C / SIGINT）
 # =============================================================================
 
-set -Eeo pipefail  # 注：未启用 -u，脚本大量使用 `if [ "$2" ]` 检测可选位置参数（17 处），与 -u 不兼容（已知限制）
+set -Eeo pipefail  # 注：未启用 -u，脚本大量使用可选位置参数检测，与 -u 不兼容
 SCRIPT_NAME="linux-mirrors"
 SCRIPT_VERSION="1.0"
+
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
 ## 项目兼容层：标准日志函数（供 netool懒人工具箱 调用时使用，不影响脚本自身输出函数）
 COLOR_RED="" COLOR_GREEN="" COLOR_YELLOW="" COLOR_CYAN="" COLOR_BOLD="" COLOR_RESET=""

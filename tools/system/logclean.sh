@@ -458,8 +458,8 @@ do_clean() {
 # 返回值:随分派函数返回；获取锁失败返回 1
 # ----------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "logclean" "另一个 logclean 实例正在运行，请等待其完成后再试。" || return 1
 
   local action="status"

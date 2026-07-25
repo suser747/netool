@@ -159,8 +159,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 # 加载公共函数库并获取 wipe 全局锁，避免多实例并发擦盘
-# shellcheck source=../common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 ayu_acquire_lock "wipe" "另一个 wipe 实例正在运行，请等待其完成后再试。" || exit 1
 
 # 非预览模式必须以 root 执行

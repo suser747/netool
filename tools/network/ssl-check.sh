@@ -271,8 +271,8 @@ load_targets_from_file() {
 # 参数：$@ - 命令行参数（域名/IP 与选项）
 # 返回值：0 - 成功, 非 0 - 加锁失败或检查错误
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "ssl-check" "另一个 ssl-check 实例正在运行，请等待其完成后再试。" || return 1
 
   local file=""

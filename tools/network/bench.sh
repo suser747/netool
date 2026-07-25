@@ -254,8 +254,8 @@ do_net() {
 # 返回值: 0 - 成功, 非 0 - 加锁失败或测试错误
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "bench" "另一个 bench 实例正在运行,请等待其完成后再试。" || return 1
 
   local action="all"

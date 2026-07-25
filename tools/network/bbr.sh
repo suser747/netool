@@ -10,7 +10,7 @@
 # 功能说明:
 #   管理 Linux 内核自带的 BBR 拥塞控制算法,支持查看状态、启用与禁用。
 #   仅启用内核自带的 BBR,不安装第三方内核,不涉及 BBRv3。
-#   启用时会在 /var/backups/ayu-bbr 目录下生成带时间戳的 sysctl 备份,
+#   启用时会在 /var/backups/netool-bbr 目录下生成带时间戳的 sysctl 备份,
 #   禁用时可据此恢复原始拥塞控制与队列算法。
 #
 # 使用方式:
@@ -34,9 +34,9 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="bbr-tools"
 SCRIPT_VERSION="2.0"
-CONF_FILE="/etc/sysctl.d/99-ayu-bbr.conf"
+CONF_FILE="/etc/sysctl.d/99-netool-bbr.conf"
 # 备份根目录: 每次启用 BBR 时在此目录下生成 sysctl.conf.bak.<时间戳> 文件
-BACKUP_DIR="/var/backups/ayu-bbr"
+BACKUP_DIR="/var/backups/netool-bbr"
 DRY_RUN=0
 YES=0
 
@@ -396,8 +396,8 @@ do_disable() {
 # 返回值: 透传子命令的退出码
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "bbr" "另一个 bbr 实例正在运行,请等待其完成后再试。" || return 1
   print_banner
   local args=()

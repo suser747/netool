@@ -119,7 +119,7 @@ find tools -name "*.sh" -exec chmod +x {} \;
    - 登录类型：正常 / 密钥文件
    - 用户：用户名
    - 密码：密码（或选择密钥文件）
-3. 连接后，右侧找到服务器目标目录（如 `/opt/ayu-toolbox/`）
+3. 连接后，右侧找到服务器目标目录（如 `/opt/netool/`）
 4. 左侧找到本地项目文件夹 `lt-main/`
 5. 全选本地文件，拖拽到右侧服务器目录
 6. 等待上传完成
@@ -138,10 +138,10 @@ find tools -name "*.sh" -exec chmod +x {} \;
 
 ```bash
 # 上传整个项目到服务器
-scp -r -P 22 /本地路径/lt-main/* username@服务器IP:/opt/ayu-toolbox/
+scp -r -P 22 /本地路径/lt-main/* username@服务器IP:/opt/netool/
 
 # 然后登录服务器赋权
-ssh -p 22 username@服务器IP "mkdir -p /opt/ayu-toolbox && chmod +x /opt/ayu-toolbox/main.sh /opt/ayu-toolbox/check.sh && find /opt/ayu-toolbox/tools -name "*.sh" -exec chmod +x {} \;"
+ssh -p 22 username@服务器IP "mkdir -p /opt/ayu-toolbox && chmod +x /opt/netool/main.sh /opt/netool/check.sh && find /opt/netool/tools -name "*.sh" -exec chmod +x {} \;"
 ```
 
 > **提示：** 如果项目中包含中文文件名，请确保服务器终端和本地终端编码一致（推荐 UTF-8）。
@@ -248,7 +248,7 @@ cd /opt/ayu-toolbox
 如果想在任何目录都能直接调用，添加软链接：
 
 ```bash
-ln -s /opt/ayu-toolbox/main.sh /usr/local/bin/ayu
+ln -s /opt/netool/main.sh /usr/local/bin/ayu
 chmod +x /usr/local/bin/ayu
 ```
 
@@ -328,7 +328,7 @@ export LANG=en_US.UTF-8
 如果服务器有 Git 环境，直接在项目目录执行：
 
 ```bash
-git pull --ff-only origin main
+git pull --ff-only origin master
 ```
 
 没有 Git 的话，重新上传覆盖即可。
@@ -336,7 +336,7 @@ git pull --ff-only origin main
 ### Q5：安装到哪个目录比较好？
 
 推荐：
-- `/opt/ayu-toolbox/` — 全局工具统一存放
+- `/opt/netool/` — 全局工具统一存放
 - `~/ayu-toolbox/` — 当前用户使用
 
 根据实际情况选择即可。

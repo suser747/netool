@@ -304,8 +304,8 @@ analyze_files() {
 # 返回值: 0 - 成功；1 - 一般错误
 # -----------------------------------------------------------------------------
 main() {
-  # shellcheck source=../common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
   while (($# > 0)); do
     case "$1" in

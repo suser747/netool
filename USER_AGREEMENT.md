@@ -20,7 +20,7 @@ netool 懒人工具箱用于辅助 Linux 系统信息查看、网络排查、Doc
 执行任何破坏性操作前，请仔细阅读脚本显示的目标预览和风险提示。对硬盘检测类操作，建议先运行：
 
 ```bash
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk-test --plan
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk-test --plan
 ```
 
 真正执行全盘写入检测时，脚本会要求输入确认短语 `DESTROY-DISK-TEST`。
@@ -28,7 +28,7 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk-test --plan
 擦盘前请先预览明确目标盘：
 
 ```bash
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk wipe --plan --devices /dev/sdX
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk wipe --plan --devices /dev/sdX
 ```
 
 ## 4. 隐私与数据安全

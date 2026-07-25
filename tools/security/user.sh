@@ -37,8 +37,8 @@ SCRIPT_NAME="user-tools"
 SCRIPT_VERSION="2.0"
 SSHD_CONFIG="/etc/ssh/sshd_config"
 SSHD_DROPIN_DIR="/etc/ssh/sshd_config.d"
-MANAGED_DROPIN_FILE="${SSHD_DROPIN_DIR}/99-ayu-user-tools.conf"
-BACKUP_ROOT="/var/backups/ayu-user-tools"
+MANAGED_DROPIN_FILE="${SSHD_DROPIN_DIR}/99-netool-user-tools.conf"
+BACKUP_ROOT="/var/backups/netool-user-tools"
 DRY_RUN=0
 YES=0
 
@@ -646,8 +646,8 @@ EOF
 # 返回值: 0 表示正常结束；非 0 表示获取锁失败或参数错误
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "user-tools" "另一个 user 实例正在运行，请等待其完成后再试。" || return 1
 
   local action="list"

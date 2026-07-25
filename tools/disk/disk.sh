@@ -37,8 +37,8 @@ set -Eeuo pipefail
 SCRIPT_NAME="disk-manager"
 SCRIPT_VERSION="2.0"
 REPO_URL="https://gitee.com/suser747/netool"
-SCRIPT_URL="https://gitee.com/suser747/netool/raw/main/tools/disk.sh"
-RAW_BASE_URL="https://gitee.com/suser747/netool/raw/main"
+SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/tools/disk/disk.sh"
+RAW_BASE_URL="https://gitee.com/suser747/netool/raw/master"
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-${0:-}}"
 if [[ -n "$SCRIPT_SOURCE" && "$SCRIPT_SOURCE" != "bash" && "$SCRIPT_SOURCE" != "-bash" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
@@ -254,8 +254,8 @@ netool懒人工具箱 | 磁盘管理 v${SCRIPT_VERSION}
 
 用法：
   curl -fsSL ${SCRIPT_URL} | bash
-  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk
-  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk <操作> [参数...]
+  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk
+  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk <操作> [参数...]
 
 操作：
   partition              分区、格式化、挂载新磁盘
@@ -767,8 +767,7 @@ run_disk_subtool() {
   shift || true
 
   local local_path="${SCRIPT_DIR}/${script}"
-  local tmp_file=""
-  local url="${RAW_BASE_URL}/tools/disk/${script}"
+  local common_path=""
   local status=0
 
   if [[ -f "$local_path" ]]; then
@@ -777,23 +776,40 @@ run_disk_subtool() {
   fi
 
   command_exists curl || die "缺少必要命令：curl"
-  tmp_file="$(mktemp)"
 
-  if ! curl -fsSL "$url" -o "$tmp_file"; then
-    rm -f "$tmp_file"
-    die "下载磁盘子脚本失败：${url}"
+  mkdir -p "$SCRIPT_DIR"
+  if ! curl -fsSL "${RAW_BASE_URL}/tools/disk/${script}" -o "$local_path"; then
+    die "下载磁盘子脚本失败：${RAW_BASE_URL}/tools/disk/${script}"
+  fi
+  chmod 700 "$local_path"
+
+  if ! bash -n "$local_path" 2>/dev/null; then
+    rm -f "$local_path"
+    die "下载的子脚本语法校验失败：tools/disk/${script}"
   fi
 
-  chmod 700 "$tmp_file"
-
-  # 下载后做语法校验，避免下载内容被篡改或截断导致执行任意代码
-  if ! bash -n "$tmp_file" 2>/dev/null; then
-    rm -f "$tmp_file"
-    die "下载的子脚本语法校验失败：${url}"
+  common_path="$(dirname "$SCRIPT_DIR")/common.sh"
+  local loader_path="$(dirname "$SCRIPT_DIR")/load_common.sh"
+  if [[ ! -f "$common_path" ]]; then
+    mkdir -p "$(dirname "$common_path")"
+    if ! curl -fsSL "${RAW_BASE_URL}/tools/common.sh" -o "$common_path"; then
+      die "下载 common.sh 失败"
+    fi
+    if ! bash -n "$common_path" 2>/dev/null; then
+      rm -f "$common_path"
+      die "common.sh 语法校验失败"
+    fi
+    chmod 600 "$common_path"
   fi
+  if [[ ! -f "$loader_path" ]]; then
+    if ! curl -fsSL "${RAW_BASE_URL}/tools/load_common.sh" -o "$loader_path"; then
+      die "下载 load_common.sh 失败"
+    fi
+    chmod 700 "$loader_path"
+  fi
+  export NETOOL_COMMON_FILE="$common_path"
 
-  bash "$tmp_file" "$@" || status=$?
-  rm -f "$tmp_file"
+  bash "$local_path" "$@" || status=$?
   return "$status"
 }
 
@@ -1051,8 +1067,8 @@ parse_args() {
 # 说明: 未指定 ACTION 时进入交互式菜单循环，直到用户选择返回。
 # -----------------------------------------------------------------------------
 main() {
-  # shellcheck source=../common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "disk" "另一个 disk 实例正在运行，请等待其完成后再试。" || return 1
   parse_args "$@"
   print_banner
@@ -1074,7 +1090,7 @@ main() {
     printf "  6. 擦盘预览（真正执行需命令行指定 --devices）\n"
     printf "  b. 返回\n"
     if ! read_prompt "输入编号： " answer; then
-      log_error "无法读取输入。请改用：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) disk <操作>"
+      log_error "无法读取输入。请改用：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk <操作>"
       return 1
     fi
 

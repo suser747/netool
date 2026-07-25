@@ -1091,8 +1091,8 @@ generate_report() {
 #       调用 run_one_disk，全部完成后生成 Markdown 报告。
 # -----------------------------------------------------------------------------
 main() {
-    # shellcheck source=../common.sh
-    source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+    # shellcheck source=../load_common.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
     ayu_acquire_lock "disk-test" "另一个 disk-test 实例正在运行，请等待其完成后再试。" || exit 1
 
     if [[ "$PLAN_ONLY" != "1" ]]; then

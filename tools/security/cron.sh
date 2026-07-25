@@ -33,7 +33,7 @@ set -Eeuo pipefail
 
 SCRIPT_NAME="cron-tools"
 SCRIPT_VERSION="2.0"
-BACKUP_ROOT="/var/backups/ayu-cron-tools"
+BACKUP_ROOT="/var/backups/netool-cron-tools"
 TARGET_USER=""
 RESTORE_FILE=""
 LIST_TIMERS=0
@@ -429,8 +429,8 @@ list_backups() {
 # 返回值: 0 表示正常结束；非 0 表示获取锁失败或参数错误
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "cron-tools" "另一个 cron 实例正在运行，请等待其完成后再试。" || return 1
 
   local action="list"

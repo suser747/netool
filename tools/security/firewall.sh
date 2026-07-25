@@ -10,7 +10,7 @@
 # 功能说明:
 #   跨后端（ufw / firewalld / nftables / iptables）查看防火墙状态、放行端口。
 #   在放行端口等修改性操作前，会先将当前规则集导出到
-#   /var/backups/ayu-firewall/ 下命名为 <后端>.rules.<时间戳> 或 <后端>.<时间戳>.txt，
+#   /var/backups/netool-firewall/ 下命名为 <后端>.rules.<时间戳> 或 <后端>.<时间戳>.txt，
 #   便于失败时手动恢复。
 #
 # 使用方式:
@@ -36,7 +36,7 @@ SCRIPT_VERSION="2.0"
 YES=0
 DRY_RUN=0
 # 防火墙规则集备份根目录: 每次修改前在此目录下生成带时间戳的规则快照
-BACKUP_DIR="/var/backups/ayu-firewall"
+BACKUP_DIR="/var/backups/netool-firewall"
 
 COLOR_RED=""
 COLOR_GREEN=""
@@ -356,8 +356,8 @@ do_allow() {
 # 返回值: 透传子命令的退出码
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "firewall" "另一个 firewall 实例正在运行，请等待其完成后再试。" || return 1
   local action="${1:-status}"
   [[ $# -gt 0 ]] && shift || true

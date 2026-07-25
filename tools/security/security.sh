@@ -9,8 +9,8 @@
 #
 # 功能说明:
 #   管理 Fail2ban 服务及其 SSH 防护配置，支持查看状态、安装与启用 SSH 防护。
-#   启用 SSH 防护时会写入 /etc/fail2ban/jail.d/ayu-sshd.conf，
-#   若该文件已存在则先按时间戳备份（jail.d/ayu-sshd.conf.bak.<时间戳>），
+#   启用 SSH 防护时会写入 /etc/fail2ban/jail.d/netool-sshd.conf，
+#   若该文件已存在则先按时间戳备份（jail.d/netool-sshd.conf.bak.<时间戳>），
 #   确保后续可手动回滚。
 #   默认规则: maxretry=5，findtime=10m，bantime=1h，仅保护 sshd jail。
 #   该工具不修改 SSH 端口，不删除已有 Fail2ban 配置。
@@ -39,7 +39,7 @@ SCRIPT_VERSION="2.0"
 YES=0
 DRY_RUN=0
 # 本工具写入的 sshd jail 配置路径
-JAIL_FILE="/etc/fail2ban/jail.d/ayu-sshd.conf"
+JAIL_FILE="/etc/fail2ban/jail.d/netool-sshd.conf"
 
 COLOR_RED=""
 COLOR_GREEN=""
@@ -347,7 +347,7 @@ EOF
 # 功能: 写入 sshd jail 配置并启用 Fail2ban SSH 防护
 # 参数: 无
 # 返回值: 0 表示成功；非 0 表示取消或缺少 fail2ban-client
-# 副作用: 若 JAIL_FILE 已存在，先按时间戳备份（jail.d/ayu-sshd.conf.bak.<时间戳>）
+# 副作用: 若 JAIL_FILE 已存在，先按时间戳备份（jail.d/netool-sshd.conf.bak.<时间戳>）
 # ------------------------------------------------------------------------------
 enable_ssh() {
   printf "\nFail2ban SSH 防护配置计划:\n"
@@ -460,8 +460,8 @@ interactive_loop() {
 # 返回值: 透传子命令的退出码
 # ------------------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "security" "另一个 security 实例正在运行，请等待其完成后再试。" || return 1
   print_banner
 

@@ -37,7 +37,7 @@ SCRIPT_NAME="linux-mirror-switcher"
 SCRIPT_VERSION="1.0"
 DEFAULT_MIRROR="tencent"
 REPO_URL="https://gitee.com/suser747/netool"
-SCRIPT_URL="https://gitee.com/suser747/netool/raw/main/tools/mirror.sh"
+SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/tools/software/mirror.sh"
 # 备份根目录：每次换源在此目录下创建 <YYYYMMDD-HHMMSS> 时间戳子目录
 BACKUP_ROOT="/var/backups/${SCRIPT_NAME}"
 # 备份目录内的元信息文件名，记录脚本名、版本、镜像站、包管理器等关键信息
@@ -92,8 +92,8 @@ if [[ -n "${AYU_TOOLBOX:-}" ]]; then
   COLOR_RESET=""
 fi
 
-# shellcheck source=common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
 # 函数: is_lang_en
 # 功能: 判断当前输出语言是否为英文
@@ -706,7 +706,7 @@ Automatically detects the system and package manager, supports both switching an
 Usage:
   curl -fsSL ${SCRIPT_URL} | bash
   bash <(curl -fsSL ${SCRIPT_URL}) [options]
-  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) mirror [options]
+  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) mirror [options]
 
 Options:
   --mirror <name>      Select a mirror. Chinese names are recommended; legacy aliases still work
@@ -748,7 +748,7 @@ netool懒人工具箱 | 一键换源 v${SCRIPT_VERSION}
 用法：
   curl -fsSL ${SCRIPT_URL} | bash
   bash <(curl -fsSL ${SCRIPT_URL}) [选项]
-  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) mirror [选项]
+  bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) mirror [选项]
 
 选项：
   --mirror <name>      指定镜像站，优先使用中文镜像名；旧的英文别名仍然兼容
@@ -837,7 +837,8 @@ known_mirror_hosts_regex() {
 # 参数: $1 - 用户输入的镜像站名称或别名（不区分大小写）
 # 返回值: 0 - 识别成功（stdout 输出标准 id）; 1 - 未识别
 canonical_mirror_id() {
-  local input="${1,,}"
+  local input
+  input="$(tolower "$1")"
 
   case "$input" in
     tuna|清华|清华大学|tsinghua)

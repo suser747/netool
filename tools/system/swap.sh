@@ -373,8 +373,8 @@ do_remove() {
 # 返回值:0 表示正常结束；非 0 表示获取锁失败或参数错误
 # ----------------------------------------------------------------------
 main() {
-  # shellcheck source=common.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+  # shellcheck source=../load_common.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
   ayu_acquire_lock "swap" "另一个 swap 实例正在运行，请等待其完成后再试。" || return 1
   local action="${1:-status}"
   local file="$DEFAULT_SWAPFILE"
