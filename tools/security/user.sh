@@ -39,6 +39,13 @@ SCRIPT_VERSION="2.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh user
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) user
+#   直接：bash tools/security/user.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 SSHD_CONFIG="/etc/ssh/sshd_config"
 SSHD_DROPIN_DIR="/etc/ssh/sshd_config.d"
 MANAGED_DROPIN_FILE="${SSHD_DROPIN_DIR}/99-netool-user-tools.conf"

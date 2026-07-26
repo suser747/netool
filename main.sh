@@ -57,6 +57,9 @@ fi
 SCRIPT_VERSION="$(head -n1 "${SCRIPT_DIR}/VERSION" 2>/dev/null | tr -d '[:space:]')"
 SCRIPT_VERSION="${SCRIPT_VERSION:-2.1}"
 
+# =============================================================================
+# 公共库 bootstrap：本地 tools/common.sh 优先；纯 curl 模式则临时下载
+# =============================================================================
 NETOOL_BOOTSTRAP_DIR=""
 if [[ -f "${SCRIPT_DIR}/tools/common.sh" ]]; then
   # shellcheck source=tools/common.sh
@@ -97,6 +100,7 @@ SELECTED_ACTION=""
 SELECTED_TOOL=""
 SELECTED_ARGS=()
 
+# 尝试设置 UTF-8 / 中文 locale，避免菜单与日志乱码
 setup_locale() {
   if [[ -z "${LANG:-}" ]] || [[ "${LANG:-}" != *UTF-8* && "${LANG:-}" != *utf-8* ]]; then
     if command -v locale >/dev/null 2>&1; then
@@ -119,6 +123,10 @@ ORIG_LC_CTYPE="${LC_CTYPE:-}"
 
 setup_locale
 
+# =============================================================================
+# 操作系统识别与中文显示环境提示
+# =============================================================================
+# 解析 /etc/os-release 等，填充 OS_ID / OS_FAMILY / OS_PACKAGE_MANAGER
 detect_os() {
   OS_ID="unknown"
   OS_VERSION_ID=""
@@ -201,6 +209,7 @@ detect_os() {
   esac
 }
 
+# locale 非 UTF-8 或非中文时给出一次性提示（可用 NETOOL_SKIP_LOCALE_TIP=1 跳过）
 check_display_env() {
   [[ "${NETOOL_SKIP_LOCALE_TIP:-0}" == "1" ]] && return 0
 
@@ -247,6 +256,7 @@ check_display_env() {
 
 check_display_env
 
+# 打印 netool 横幅与版本号
 print_banner() {
   printf "%s" "$COLOR_CYAN"
   cat <<'EOF'
@@ -262,10 +272,12 @@ EOF
   print_divider
 }
 
+# 打印带颜色的章节标题
 print_section() {
   printf "%s%s----------------------%s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET"
 }
 
+# 首次运行展示用户许可，写入 ~/.config/netool/license-v1
 confirm_license() {
   if [[ -n "${NETOOL_SKIP_LICENSE:-}" || -n "${AYU_SKIP_LICENSE:-}" || $# -gt 0 ]]; then
     return 0
@@ -301,6 +313,7 @@ confirm_license() {
   esac
 }
 
+# check 子项：一组命令中至少一个可用则标记为可用
 check_command_group() {
   local label="$1"
   shift
@@ -317,6 +330,7 @@ check_command_group() {
   return 1
 }
 
+# check 子项：检测当前用户是否具备 root/sudo 能力
 check_root_capability() {
   local label="$1"
   if is_root_user; then
@@ -326,6 +340,7 @@ check_root_capability() {
   fi
 }
 
+# check 子项：关键路径可读/可写状态
 check_file_path() {
   local label="$1"
   local path="$2"
@@ -336,6 +351,7 @@ check_file_path() {
   fi
 }
 
+# check 子项：根据 OS 推断包管理器名称
 detect_package_manager() {
   if command_exists apt || command_exists apt-get; then
     printf "apt"
@@ -354,6 +370,7 @@ detect_package_manager() {
   fi
 }
 
+# 内置 check：依赖、权限、路径、各工具所需命令的可用性矩阵
 run_capability_check() {
   local pkg_mgr=""
   pkg_mgr="$(detect_package_manager)"
@@ -412,14 +429,20 @@ run_capability_check() {
   printf "  硬盘验盘真正执行会全盘写入，必须先预览并输入 DESTROY-DISK-TEST。\n"
 }
 
+# =============================================================================
+# 内置：只读状态面板与版本展示（不下载子脚本）
+# =============================================================================
+# status 子项：格式化输出「标签 值」一行
 status_line() {
   printf "  %-12s %s\n" "$1" "$2"
 }
 
+# status 子项：打印分节标题
 status_section() {
   printf "\n%s[%s]%s\n" "$COLOR_CYAN" "$1" "$COLOR_RESET"
 }
 
+# 内置 status：系统/时间/网络/安全/Docker/工具箱部署方式摘要（不下载子脚本）
 run_status_panel() {
   detect_os
 
@@ -509,6 +532,7 @@ run_status_panel() {
   printf "\n%s提示:%s 依赖与命令可用性请运行 ${COLOR_BOLD}./main.sh check${COLOR_RESET}\n" "$COLOR_YELLOW" "$COLOR_RESET"
 }
 
+# 内置 versions：读取 tools/versions.env 或远程拉取后展示组件版本
 run_versions_display() {
   if [[ -f "${SCRIPT_DIR}/tools/versions.env" ]]; then
     netool_print_all_versions "$SCRIPT_DIR"
@@ -529,6 +553,7 @@ run_versions_display() {
   log_info "完整组件版本列表需本地部署或联网读取 tools/versions.env"
 }
 
+# 打印 --help 用法与示例
 usage() {
   cat <<EOF
 netool懒人工具箱 v${SCRIPT_VERSION}
@@ -594,6 +619,7 @@ netool懒人工具箱 v${SCRIPT_VERSION}
 EOF
 }
 
+# 打印 --list 工具分类与别名列表
 list_tools() {
   local b="${COLOR_BOLD}${COLOR_CYAN}"
   local r="${COLOR_RESET}"
@@ -655,6 +681,7 @@ list_tools() {
   printf "%s说明:${r} *仅提示命令  !毁数据  不确定请先输入 ${b}01${r}\n" "$y"
 }
 
+# 将菜单编号或别名解析为工具名与参数（如 15 → mirror）
 resolve_selection() {
   local input="${1:-}"
   local input_lower
@@ -806,6 +833,10 @@ resolve_selection() {
   return 0
 }
 
+# =============================================================================
+# 工具路由：菜单别名 → tools/ 下相对路径
+# =============================================================================
+# 工具别名 → tools/ 下相对路径（未知别名返回 1）
 tool_rel_path() {
   case "$1" in
     system) printf "tools/system/system.sh" ;;
@@ -835,16 +866,22 @@ tool_rel_path() {
   esac
 }
 
+# 构造子脚本 Gitee raw URL
 tool_script_url() {
   local rel=""
   rel="$(tool_rel_path "$1")" || return 1
   printf "%s/%s" "$RAW_BASE_URL" "$rel"
 }
 
+# 是否存在本地 main.sh + tools/ 目录（决定走本地还是远程下载）
 is_local_deploy() {
   [[ -f "${SCRIPT_DIR}/main.sh" && -d "${SCRIPT_DIR}/tools" ]]
 }
 
+# =============================================================================
+# 远程模式：从 Gitee raw 下载子脚本，校验后执行
+# =============================================================================
+# 从 RAW_BASE_URL 下载相对路径文件，bash -n 校验后 chmod 700
 fetch_remote_file() {
   local rel_path="$1"
   local dest="$2"
@@ -861,6 +898,7 @@ fetch_remote_file() {
   return 0
 }
 
+# 远程脚本注入 NETOOL_COMMON_FILE bootstrap，避免重复 source common
 patch_remote_script() {
   local script_file="$1"
   local patched="${script_file}.patched"
@@ -875,6 +913,7 @@ patch_remote_script() {
   mv "$patched" "$script_file"
 }
 
+# 远程临时目录确保 common.sh / load_common.sh 可用
 ensure_remote_common() {
   local tmp_root="$1"
   local common="${tmp_root}/tools/common.sh"
@@ -887,6 +926,7 @@ ensure_remote_common() {
   return 0
 }
 
+# 工具别名 → 中文显示名（菜单用）
 tool_display_name() {
   case "$1" in
     system) printf "系统信息与基础维护\n" ;;
@@ -916,6 +956,7 @@ tool_display_name() {
   esac
 }
 
+# update 命令：本地 git pull 或提示 curl 在线入口已是最新
 run_self_update() {
   local origin_url=""
   local update_output=""
@@ -946,10 +987,14 @@ run_self_update() {
   return 2
 }
 
+# 缺少命令时 die 退出
 require_command() {
   command_exists "$1" || die "缺少必要命令：$1"
 }
 
+# =============================================================================
+# run_tool — 统一子工具调度：本地直跑 / 远程下载临时脚本
+# =============================================================================
 run_tool() {
   local tool="$1"
   shift || true
@@ -1002,6 +1047,7 @@ run_tool() {
   rm -rf "$tmp_root"
 }
 
+# init 向导包装：审计日志 + 委托 run_tool init
 run_init_wizard() {
   audit_log "init_wizard" "start"
   run_tool init "$@"
@@ -1015,6 +1061,7 @@ run_init_wizard() {
   return "$rc"
 }
 
+# uninstall：删除 ~/.config/netool 与 /var/log/netool（不卸载已装软件）
 run_uninstall() {
   audit_log "uninstall" "requested"
 
@@ -1059,6 +1106,7 @@ run_uninstall() {
   return 0
 }
 
+# 交互式菜单主循环：list_tools → 读入编号 → resolve_selection → 执行
 interactive_loop() {
   local answer=""
 
@@ -1122,6 +1170,7 @@ interactive_loop() {
   done
 }
 
+# 入口：解析全局选项 → 许可确认 → 参数模式或 interactive_loop
 main() {
   while (($# > 0)); do
     case "${1:-}" in

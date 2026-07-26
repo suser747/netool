@@ -52,6 +52,13 @@ SCRIPT_VERSION="2.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh homebrew
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) homebrew
+#   直接：bash tools/software/homebrew.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 
 # 命令行参数标志（在入口参数解析处赋值）
 # DRY_RUN=1 时仅预览将要执行的操作，不实际执行

@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# netool懒人工具箱 - 公共函数库
+# netool 懒人工具箱 - 公共函数库 (tools/common.sh)
+# =============================================================================
+# 职责：
+#   1. 定义品牌路径、远程 raw URL、配置目录等全局常量
+#   2. 提供日志、颜色、交互输入、错误处理等统一 API
+#   3. 提供并发锁、备份、审计、脚本校验等安全辅助函数
+# 加载方式：
+#   - main.sh 直接 source
+#   - 子脚本通过 load_common.sh 间接 source
+# 注意：使用 return 防止重复 source；子工具模式下 NETOOL=1 会简化错误输出
 # =============================================================================
 
-# 防止重复 source
 [[ -n "${NETOOL_COMMON_SOURCED:-}" ]] && return 0
 NETOOL_COMMON_SOURCED=1
 
@@ -18,17 +26,19 @@ NETOOL_RAW_BRANCH="${NETOOL_RAW_BRANCH:-master}"
 NETOOL_RAW_BASE="${NETOOL_REPO_URL}/raw/${NETOOL_RAW_BRANCH}"
 NETOOL_ENTRY_URL="${NETOOL_RAW_BASE}/main.sh"
 
-# 兼容旧版 ayu-toolbox 路径（读取许可、迁移配置）
+# 兼容旧版 ayu-toolbox 配置目录（读取许可、迁移时使用）
 NETOOL_LEGACY_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME:-}/.config}/ayu-toolbox"
 NETOOL_LEGACY_LOG_DIR="/var/log/netool"
 
-# 工具箱内部调用标记（legacy: AYU_TOOLBOX 同步为 NETOOL，供旧环境变量兼容）
+# 主入口调用子工具时设置 NETOOL=1；legacy 变量 AYU_TOOLBOX 与之同步
 NETOOL="${NETOOL:-${AYU_TOOLBOX:-}}"
 AYU_TOOLBOX="${AYU_TOOLBOX:-$NETOOL}"
 
 # -----------------------------------------------------------------------------
-# 工具函数
+# 字符串与元数据工具
 # -----------------------------------------------------------------------------
+
+# join_by SEP ARG... — 用 SEP 连接多个字符串，用于拼接命令行等
 join_by() {
   local separator="$1"
   shift
@@ -43,16 +53,24 @@ join_by() {
   done
 }
 
+# metadata_value FILE KEY — 从 key=value 元数据文件读取指定键
 metadata_value() {
   local metadata_file="$1" key="$2"
   [[ -f "$metadata_file" ]] || return 0
   awk -F= -v key="$key" '$1 == key { print substr($0, index($0, "=") + 1); exit }' "$metadata_file"
 }
 
+# tolower STR — Bash 3.2 兼容的小写转换（替代 ${var,,}）
 tolower() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# -----------------------------------------------------------------------------
+# 并发控制
+# -----------------------------------------------------------------------------
+
+# netool_acquire_lock NAME [MSG] — 基于 flock 的进程锁，防止同工具并发执行
+# 无 flock 时降级为警告并继续（不阻塞）
 netool_acquire_lock() {
   local lock_name="$1"
   local error_msg="${2:-另一个实例正在运行，请等待其完成后再试。}"
@@ -72,9 +90,13 @@ netool_acquire_lock() {
   return 0
 }
 
-# 兼容旧函数名
-netool_acquire_lock() { netool_acquire_lock "$@"; }
+ayu_acquire_lock() { netool_acquire_lock "$@"; }
 
+# -----------------------------------------------------------------------------
+# 配置与许可路径
+# -----------------------------------------------------------------------------
+
+# netool_config_dir — 返回当前生效的用户配置目录（新路径优先，否则 legacy）
 netool_config_dir() {
   if [[ -d "$NETOOL_CONFIG_DIR" || ! -d "$NETOOL_LEGACY_CONFIG_DIR" ]]; then
     printf '%s' "$NETOOL_CONFIG_DIR"
@@ -83,6 +105,7 @@ netool_config_dir() {
   fi
 }
 
+# netool_license_file VERSION — 返回许可确认文件的完整路径
 netool_license_file() {
   local version="${1:-1}"
   local primary="${NETOOL_CONFIG_DIR}/license-v${version}.accepted"
@@ -95,7 +118,7 @@ netool_license_file() {
 }
 
 # =============================================================================
-# 颜色与日志
+# 颜色与日志（QUIET=1 或 NETOOL 子工具模式下行为见各函数）
 # =============================================================================
 COLOR_RED=""
 COLOR_GREEN=""
@@ -105,6 +128,7 @@ COLOR_CYAN=""
 COLOR_BOLD=""
 COLOR_RESET=""
 
+# 独立运行子脚本且 stdout 为终端时启用颜色；被 main.sh 调用时不重复着色
 if [[ -t 1 && -z "${NETOOL:-}" ]]; then
   COLOR_RED=$'\033[31m'
   COLOR_GREEN=$'\033[32m'
@@ -123,6 +147,7 @@ log_warn()    { (( QUIET == 1 )) || printf "%s%s[警告]%s %s\n" "$COLOR_BOLD" "
 log_error()   { printf "%s%s[错误]%s %s\n" "$COLOR_BOLD" "$COLOR_RED" "$COLOR_RESET" "$*" >&2; }
 die()         { log_error "$*"; exit 1; }
 
+# on_error — ERR trap 回调；NETOOL 模式下省略行号避免嵌套日志冗余
 on_error() {
   local exit_code=$?
   if [[ -n "${NETOOL:-}" ]]; then
@@ -133,6 +158,7 @@ on_error() {
   exit "$exit_code"
 }
 
+# read_prompt PROMPT VAR — 读用户输入；管道场景下自动转 /dev/tty
 read_prompt() {
   local prompt="$1" var_name="$2" value=""
   if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
@@ -150,16 +176,13 @@ print_divider() { printf "%s%s%s\n" "$COLOR_CYAN" "-----------------------------
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
-is_root_user() {
-  [[ ${EUID:-$(id -u 2>/dev/null || echo 1)} -eq 0 ]]
-}
+is_root_user() { [[ ${EUID:-$(id -u 2>/dev/null || echo 1)} -eq 0 ]]; }
 
-require_root() {
-  is_root_user || die "此操作需要 root 权限，请使用 sudo 或切换到 root 用户"
-}
+require_root() { is_root_user || die "此操作需要 root 权限，请使用 sudo 或切换到 root 用户"; }
 
 timestamp() { date "+%Y%m%d_%H%M%S"; }
 
+# atomic_write TARGET SOURCE — 先写临时文件再 mv，避免半写状态
 atomic_write() {
   local target="$1" source="$2" tmp
   tmp=$(mktemp)
@@ -167,6 +190,7 @@ atomic_write() {
   mv -f "$tmp" "$target" || { rm -f "$tmp"; return 1; }
 }
 
+# backup_with_timestamp FILE — 带时间戳的副本备份，返回备份路径
 backup_with_timestamp() {
   local file="$1"
   [[ -f "$file" ]] || return 0
@@ -176,6 +200,7 @@ backup_with_timestamp() {
   printf '%s\n' "${file}.bak.${ts}"
 }
 
+# audit_log ACTION DETAIL — root 下写入审计日志（不记录敏感内容）
 audit_log() {
   local action="$1"
   shift || true
@@ -221,6 +246,7 @@ confirm_phrase() {
   [[ "$input" == "$phrase" ]] || die "确认短语不匹配，已取消"
 }
 
+# validate_bash_script FILE — 远程下载后执行前的 bash -n 语法校验
 validate_bash_script() {
   local script_file="$1"
   if ! bash -n "$script_file" 2>/dev/null; then
@@ -231,7 +257,6 @@ validate_bash_script() {
 }
 
 source_common() {
-  # 供子脚本统一引用 common.sh
   local here="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
   # shellcheck disable=SC1091
   source "$(cd "$(dirname "$here")/.." && pwd)/common.sh"

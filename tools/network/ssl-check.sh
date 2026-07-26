@@ -22,6 +22,13 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh ssl-check
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) ssl-check
+#   直接：bash tools/network/ssl-check.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 # 到期告警阈值（天）：剩余天数小于等于该值即标记为"即将到期"
 WARN_DAYS=30
 # 默认端口

@@ -29,6 +29,13 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh docker
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) docker
+#   直接：bash tools/docker/docker.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 # 交互/批量模式标志：1 表示跳过所有二次确认（-y / --yes 触发）
 YES=0
 # 安装时是否配置国内镜像加速器：1 表示配置（--mirror 触发）

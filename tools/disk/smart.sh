@@ -33,6 +33,13 @@ SCRIPT_VERSION="2.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh smart
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) smart
+#   直接：bash tools/disk/smart.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 
 LOG_DIR="/var/log/smart-long-test"
 DATE="$(date '+%Y%m%d_%H%M%S')"

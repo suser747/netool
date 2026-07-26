@@ -38,6 +38,13 @@ SCRIPT_VERSION="2.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh bbr
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) bbr
+#   直接：bash tools/network/bbr.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 CONF_FILE="/etc/sysctl.d/99-netool-bbr.conf"
 # 备份根目录: 每次启用 BBR 时在此目录下生成 sysctl.conf.bak.<时间戳> 文件
 BACKUP_DIR="/var/backups/netool-bbr"

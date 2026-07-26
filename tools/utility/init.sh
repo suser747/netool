@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# netool懒人工具箱 - 服务器初始化向导
+# =============================================================================
+# netool 懒人工具箱 - 服务器初始化向导 (tools/utility/init.sh)
+# =============================================================================
+# 功能：新服务器分步引导（系统检查 → 换源 → 基础工具 → BBR → 主机名 → SSH → Docker）
+# 调用：
+#   本地：./main.sh init
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) init
+# 说明：各步骤通过 run_tool 回调 main.sh；远程模式下用 NETOOL_ENTRY_URL 重新拉取 main
+# =============================================================================
 set -Eeuo pipefail
 
 SCRIPT_NAME="server-init"
@@ -8,9 +16,18 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh init
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) init
+#   直接：bash tools/utility/init.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
 
+
+# 远程 init 链式调用子工具时使用的 main.sh 地址（由 main.sh 注入或默认 Gitee raw）
 NETOOL_ENTRY_URL="${NETOOL_ENTRY_URL:-${NETOOL_RAW_BASE}/main.sh}"
 
+# confirm_default_no — 交互确认，默认否
 confirm_default_no() {
   local reply=""
   if ! read_prompt "(y/n) [默认: n]: " reply; then reply="n"; fi
@@ -34,6 +51,7 @@ netool懒人工具箱 | 服务器初始化向导 v${SCRIPT_VERSION}
 EOF
 }
 
+# print_banner — 独立运行时显示横幅；由 main.sh 调用时跳过
 print_banner() {
   if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   print_divider
@@ -41,6 +59,7 @@ print_banner() {
   print_divider
 }
 
+# resolve_main_sh — 本地部署时解析仓库根目录下的 main.sh 路径
 resolve_main_sh() {
   local here root
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -52,6 +71,7 @@ resolve_main_sh() {
   return 1
 }
 
+# run_tool — 通过 main.sh 调用子工具；远程模式用 curl 进程替换重新执行 main
 run_tool() {
   local tool="$1"
   shift || true

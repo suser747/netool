@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# netool 版本读取与展示（由 main.sh source）
+# =============================================================================
+# netool 版本读取与展示 (tools/version.sh)
+# =============================================================================
+# 版本数据源：
+#   - VERSION           主版本号（如 2.1）
+#   - tools/versions.env  各子工具版本（key=value）
+# 由 main.sh source；versions 命令与 --version 使用下列函数
+# =============================================================================
 
+# netool_read_main_version ROOT — 读取 ROOT/VERSION 第一行
 netool_read_main_version() {
   local root="${1:-}"
   local v=""
@@ -10,6 +18,7 @@ netool_read_main_version() {
   printf '%s' "${v:-2.1}"
 }
 
+# netool_versions_file ROOT — 返回 versions.env 路径，不存在则失败
 netool_versions_file() {
   local root="${1:-}"
   if [[ -f "${root}/tools/versions.env" ]]; then
@@ -19,6 +28,7 @@ netool_versions_file() {
   return 1
 }
 
+# netool_version_of TOOL_ID ROOT — 查询单个组件版本号
 netool_version_of() {
   local tool_id="$1"
   local root="${2:-}"
@@ -40,6 +50,7 @@ netool_version_of() {
   return 1
 }
 
+# netool_print_all_versions ROOT — 打印主版本 + 组件版本列表
 netool_print_all_versions() {
   local root="${1:-}"
   local file line key val

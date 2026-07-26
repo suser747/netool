@@ -35,6 +35,13 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh basic
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) basic
+#   直接：bash tools/software/basic.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 
 # 需要安装的基础软件包列表（统一名称，由 mapped_packages 做发行版映射）
 PACKAGES=(curl wget git vim nano unzip tar gzip ca-certificates net-tools dnsutils lsof htop iotop iftop)

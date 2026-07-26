@@ -32,6 +32,13 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh swap
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) swap
+#   直接：bash tools/system/swap.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 DEFAULT_SWAPFILE="/swapfile"
 DEFAULT_SIZE="2G"
 YES=0

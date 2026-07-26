@@ -34,6 +34,13 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh ntp
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) ntp
+#   直接：bash tools/system/ntp.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 NTP_SERVERS="ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org"
 TIMEZONE="Asia/Shanghai"
 DRY_RUN=0

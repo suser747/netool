@@ -31,6 +31,12 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh lmirrors [参数...]
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) lmirrors [参数...]
+#   直接：bash tools/software/lmirrors.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
 
 ## 定制方法
 # 只需要在头部（此处）定义全局变量即可，具体详见官网文档，简单写几个例子

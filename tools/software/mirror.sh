@@ -67,6 +67,13 @@ TOTAL_STEPS=0
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
+# -----------------------------------------------------------------------------
+# 运行方式
+#   本地：cd /opt/netool && ./main.sh mirror
+#   远程：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) mirror
+#   直接：bash tools/software/mirror.sh [参数...]  （需在 tools 目录结构完整时）
+# -----------------------------------------------------------------------------
+
 
 # 函数: is_lang_en
 # 功能: 判断当前输出语言是否为英文

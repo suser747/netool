@@ -11,10 +11,10 @@
 - 统一远程 raw URL 为 `master` 分支
 - 修复 `set -u` 下空数组未绑定变量；Bash 3.2 兼容 `tolower()`
 
-### 新增
+### 文档
 
-- 完整使用说明已整合至 [README.md](./README.md)（含 curl 远程、本地部署、分系统教程、许可协议、贡献指南）
-- `scripts/test-remote.sh` 远程模式自动化测试
+- 精简 [README.md](./README.md)：curl 远程 vs 本地直接使用分栏说明、命令对照表、项目截图占位（`docs/images/`）
+- 核心库与子脚本补充运行方式注释；`main.sh` 各函数增加说明注释
 
 ### 优化
 
