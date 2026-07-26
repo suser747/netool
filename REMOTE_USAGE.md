@@ -1,53 +1,38 @@
 # 远程使用指南（curl 一键运行）
 
-本文说明如何**不克隆仓库、不上传 FTP**，直接在 Linux 服务器上通过 `curl` 拉取脚本并使用 netool 懒人工具箱。
+> 完整双模式说明（本地 + curl）请参阅 **[USAGE.md](./USAGE.md)**。本文专注 curl 远程场景。
 
 ## 在线入口
 
-```bash
-# 固定地址（Gitee master 分支）
+```
 https://gitee.com/suser747/netool/raw/master/main.sh
 ```
 
-> 请始终使用 `https://`，不要省略协议头。
+下文 `$ENTRY` 即上述地址。
 
 ---
 
-## 两种推荐用法
-
-### 1. 交互式菜单（适合首次使用）
+## 快速上手
 
 ```bash
-curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh | bash
-```
+ENTRY="https://gitee.com/suser747/netool/raw/master/main.sh"
 
-**注意**：管道模式下 stdin 被占用，菜单输入可能无响应。若无法输入，请改用下方「进程替换」写法：
+# 1. 交互菜单（必须用进程替换，否则菜单可能无法输入）
+bash <(curl -fsSL "$ENTRY")
 
-```bash
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)
-```
+# 2. 参数调用（日常推荐）
+bash <(curl -fsSL "$ENTRY") check
+bash <(curl -fsSL "$ENTRY") status
+bash <(curl -fsSL "$ENTRY") versions
+bash <(curl -fsSL "$ENTRY") system info
+bash <(curl -fsSL "$ENTRY") mirror --plan
+bash <(curl -fsSL "$ENTRY") init
 
-### 2. 参数式调用（推荐日常使用）
+# 3. 静默模式
+bash <(curl -fsSL "$ENTRY") -q check
 
-直接指定工具名和参数，**不进入菜单**，参数传递更清晰：
-
-```bash
-# 功能检查
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) check
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) versions
-
-# 系统信息
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) system
-
-# 换源预览（不修改系统）
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) mirror --plan
-
-# SSH 端口 staged 模式
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) ssh --port 2222 --mode staged -y
-
-# 静默模式（只输出错误）
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) -q check
+# 4. 快捷别名（写入 ~/.bashrc）
+alias netool='bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)'
 ```
 
 ---
@@ -55,23 +40,21 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) -q check
 ## 工作原理
 
 ```
-curl 下载 main.sh
-       ↓
-main.sh 启动
-       ├─ 本地有 tools/ 目录 → 直接运行本地子脚本（FTP/克隆部署）
-       └─ 远程模式（仅 main.sh）
-              ├─ 下载 tools/common.sh（启动引导）
-              ├─ 按工具名下载对应子脚本（保留 tools/ 目录结构）
-              ├─ bash -n 语法校验
-              └─ 执行后自动清理临时目录
+curl 下载 main.sh → main.sh 启动
+  ├─ 本地有 tools/ → 直接运行本地子脚本
+  └─ 纯远程模式
+        ├─ bootstrap 下载 tools/common.sh
+        ├─ 按需下载子脚本 + bash -n 校验
+        └─ 执行后清理临时目录
 ```
 
-远程模式下：
+| 类型 | 命令示例 | 是否下载子脚本 |
+|------|----------|----------------|
+| 内置 | `check` `status` `versions` `update` `uninstall` | 否 |
+| 子工具 | `mirror` `disk` `ssh` `system` … | 是 |
+| disk 子功能 | `disk-test` `smart-long` `slot-map` | disk.sh 二次下载 |
 
-- `check`、`status`、`versions`、`update`、`uninstall` 等内置功能**不下载**子脚本
-- `mirror`、`disk`、`ssh` 等工具会**按需下载**对应脚本
-- `disk` 的磁盘子脚本（验盘、SMART 等）由 `disk.sh` **二次按需下载**
-- 每次运行拉取 Gitee 上最新代码，**无需手动更新**
+每次运行拉取 Gitee `master` 最新代码，**无需手动更新**。
 
 ---
 
@@ -79,20 +62,23 @@ main.sh 启动
 
 | 场景 | 命令 |
 |------|------|
-| 进入菜单 | `curl -fsSL .../main.sh \| bash` |
-| 功能检查 | `bash <(curl -fsSL .../main.sh) check` |
-| 系统信息 | `bash <(curl -fsSL .../main.sh) system` |
-| 轻量换源 | `bash <(curl -fsSL .../main.sh) mirror` |
-| 全能换源 | `bash <(curl -fsSL .../main.sh) lmirrors` |
-| 磁盘管理 | `bash <(curl -fsSL .../main.sh) disk status` |
-| 验盘预览 | `bash <(curl -fsSL .../main.sh) disk-test --plan` |
-| 初始化向导 | `bash <(curl -fsSL .../main.sh) init` |
-| 查看工具列表 | `bash <(curl -fsSL .../main.sh) --list` |
-| 查看帮助 | `bash <(curl -fsSL .../main.sh) --help` |
+| 进入菜单 | `bash <(curl -fsSL $ENTRY)` |
+| 功能检查 | `bash <(curl -fsSL $ENTRY) check` |
+| 状态面板 | `bash <(curl -fsSL $ENTRY) status` |
+| 组件版本 | `bash <(curl -fsSL $ENTRY) versions` |
+| 系统信息 | `bash <(curl -fsSL $ENTRY) system info` |
+| 轻量换源预览 | `bash <(curl -fsSL $ENTRY) mirror --plan` |
+| 全能换源 | `bash <(curl -fsSL $ENTRY) lmirrors` |
+| SSH 改端口 | `bash <(curl -fsSL $ENTRY) ssh --port 2222 --mode staged -y` |
+| BBR 状态 | `bash <(curl -fsSL $ENTRY) bbr status` |
+| Docker 状态 | `bash <(curl -fsSL $ENTRY) docker status` |
+| 磁盘状态 | `bash <(curl -fsSL $ENTRY) disk status` |
+| 验盘预览 | `bash <(curl -fsSL $ENTRY) disk-test --plan` |
+| 初始化向导 | `bash <(curl -fsSL $ENTRY) init` |
+| 工具列表 | `bash <(curl -fsSL $ENTRY) --list` |
+| 帮助 | `bash <(curl -fsSL $ENTRY) --help` |
 
-将 `.../main.sh` 替换为：
-
-`https://gitee.com/suser747/netool/raw/master/main.sh`
+更多工具与菜单编号对照见 [USAGE.md §6](./USAGE.md#6-全部工具命令参考)。
 
 ---
 
@@ -100,111 +86,102 @@ main.sh 启动
 
 | 项目 | 要求 |
 |------|------|
-| 操作系统 | Linux（各发行版，见 README） |
+| 操作系统 | Linux |
 | Shell | Bash 3.2+ |
 | 必需命令 | `curl`、`bash` |
 | 网络 | 能访问 `gitee.com` |
-| 权限 | 查看类功能普通用户即可；改配置需 root / sudo |
+| 权限 | 查看类普通用户；改配置需 root/sudo |
 
 ---
 
-## 首次使用与许可协议
+## 首次使用与许可
 
-首次**交互式**运行会提示阅读 [用户许可协议](./USER_AGREEMENT.md)。
+- 首次**无参数**交互运行会提示 [用户许可协议](./USER_AGREEMENT.md)
+- 确认保存在 `~/.config/netool/license-v1.accepted`
+- **带工具名**调用时跳过许可提示
 
-- 确认状态保存在 `~/.config/netool/license-v1.accepted`
-- 兼容旧路径 `~/.config/ayu-toolbox/`
-- 带工具名参数调用时跳过许可提示（视为明确意图）
-
-跳过许可（自动化场景）：
+自动化跳过：
 
 ```bash
 export NETOOL_SKIP_LICENSE=1
-bash <(curl -fsSL .../main.sh) check
+bash <(curl -fsSL $ENTRY) check
 ```
+
+---
+
+## 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `NETOOL_SKIP_LICENSE=1` | 跳过许可提示 |
+| `NETOOL_SKIP_LOCALE_TIP=1` | 跳过中文 locale 提示 |
 
 ---
 
 ## 安全说明
 
-1. **预览再执行**：改配置类操作支持 `--plan` / `--dry-run` 先预览
-2. **破坏性操作**：验盘、擦盘等需 `--yes` + 确认短语
-3. **语法校验**：远程下载的脚本执行前会 `bash -n` 校验
-4. **配置备份**：SSH、BBR、换源等会自动备份，支持回滚
-5. **供应链**：建议从官方 Gitee 地址拉取；生产环境可考虑克隆仓库本地部署
+1. 改配置类支持 `--plan` / `--dry-run` 先预览
+2. 验盘/擦盘等破坏性操作需 `--yes` + 确认短语
+3. 远程脚本执行前 `bash -n` 校验
+4. SSH/BBR/换源等自动备份，可回滚
+5. 生产环境建议克隆仓库 [本地部署](./FTP_DEPLOYMENT.md)
 
 ---
 
 ## 故障排查
 
-### curl 下载失败 / 超时
-
-```bash
-# 重试 3 次
-for i in 1 2 3; do curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh | bash && break; done
-```
-
-或使用代理 / 换网络。仍失败时可 [FTP/本地部署](./FTP_DEPLOYMENT.md)。
-
 ### 菜单无法输入
 
-管道 `curl | bash` 会占用 stdin。**改用**：
+```bash
+# 错误：curl | bash 占用 stdin
+# 正确：
+bash <(curl -fsSL $ENTRY)
+```
+
+### curl 下载失败
 
 ```bash
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)
+curl -I https://gitee.com
+for i in 1 2 3; do curl -fsSL $ENTRY | bash && break; sleep 2; done
 ```
+
+仍失败 → 改用 [本地/FTP 部署](./FTP_DEPLOYMENT.md)。
 
 ### 提示「下载脚本失败」
 
-1. 确认能访问 Gitee：`curl -I https://gitee.com`
-2. 确认分支为 `master`（不是 `main`）
-3. 检查服务器是否安装 `curl`
-
-### 提示「缺少 curl」
-
-```bash
-# Debian/Ubuntu
-sudo apt install -y curl
-
-# CentOS/RHEL
-sudo yum install -y curl
-```
-
-### 子脚本 common.sh 报错
-
-请确保使用的是**最新版** `main.sh`（v2.1+）。旧版远程模式存在 common 路径问题，已修复。
+1. 确认分支为 `master`（非 `main`）
+2. 确认已安装 `curl`：`apt install -y curl` / `yum install -y curl`
+3. 确认 main.sh 为 v2.1+
 
 ### 中文乱码
 
 ```bash
 export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8
-# 或安装中文字体后重连 SSH
+export NETOOL_SKIP_LOCALE_TIP=1
 ```
 
 ---
 
-## 远程 vs 本地部署
+## 远程 vs 本地
 
-| 方式 | 优点 | 缺点 |
-|------|------|------|
-| **curl 远程** | 零安装、始终最新、一条命令 | 依赖网络、每次下载脚本 |
-| **克隆/FTP 本地** | 离线可用、更快、可改代码 | 需上传、手动 git pull 更新 |
+| | curl 远程 | 本地部署 |
+|---|-----------|----------|
+| 安装 | 零安装 | 需克隆/上传 |
+| 网络 | 必须 | 脚本可离线 |
+| 更新 | 自动最新 | `git pull` |
+| 速度 | 有下载延迟 | 更快 |
 
-本地部署详见 [FTP_DEPLOYMENT.md](./FTP_DEPLOYMENT.md)。
+本地部署详见 [FTP_DEPLOYMENT.md](./FTP_DEPLOYMENT.md) 与 [USAGE.md §3](./USAGE.md#3-本地部署运行)。
 
 ---
 
-## 维护者：发布远程可用版本
+## 维护者说明
 
-远程用户依赖 Gitee 上的 `master` 分支文件。修改代码后需推送：
+远程用户依赖 Gitee `master` 分支，修改后需推送：
 
 ```bash
-git add -A
-git commit -m "your message"
 git push origin master
 ```
-
-推送后，远程 `curl` 用户下次运行即自动获得更新。
 
 本地验证远程模式：
 
@@ -216,7 +193,7 @@ bash scripts/test-remote.sh
 
 ## 相关文档
 
+- [USAGE.md](./USAGE.md) — 完整使用说明
 - [README.md](./README.md) — 项目概览
-- [USER_AGREEMENT.md](./USER_AGREEMENT.md) — 用户许可协议
-- [FTP_DEPLOYMENT.md](./FTP_DEPLOYMENT.md) — 本地/FTP 部署
-- [CHANGELOG.md](./CHANGELOG.md) — 版本变更
+- [FTP_DEPLOYMENT.md](./FTP_DEPLOYMENT.md) — 本地部署
+- [USER_AGREEMENT.md](./USER_AGREEMENT.md) — 许可协议
