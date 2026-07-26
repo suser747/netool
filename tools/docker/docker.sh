@@ -71,7 +71,7 @@ EOF
 
 ## 输出脚本启动横幅（被外层工具箱调用时跳过）
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then return 0; fi
+  if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   printf "%s\n" "------------------------------------------------------------"
   printf "netool懒人工具箱 | Docker 工具 v%s\n" "$SCRIPT_VERSION"
   printf "%s\n" "------------------------------------------------------------"

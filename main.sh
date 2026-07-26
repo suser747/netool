@@ -34,7 +34,6 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="netool"
-SCRIPT_VERSION="2.1"
 REPO_URL="https://gitee.com/suser747/netool"
 SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
 SHORT_SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
@@ -54,6 +53,9 @@ if [[ -n "$SCRIPT_SOURCE" && "$SCRIPT_SOURCE" != "bash" && "$SCRIPT_SOURCE" != "
 else
   SCRIPT_DIR="$(pwd)"
 fi
+
+SCRIPT_VERSION="$(head -n1 "${SCRIPT_DIR}/VERSION" 2>/dev/null | tr -d '[:space:]')"
+SCRIPT_VERSION="${SCRIPT_VERSION:-2.1}"
 
 NETOOL_BOOTSTRAP_DIR=""
 if [[ -f "${SCRIPT_DIR}/tools/common.sh" ]]; then
@@ -79,6 +81,16 @@ else
 fi
 trap on_error ERR
 trap '[[ -n "${NETOOL_BOOTSTRAP_DIR:-}" ]] && rm -rf "$NETOOL_BOOTSTRAP_DIR"' EXIT
+
+if [[ -f "${SCRIPT_DIR}/tools/version.sh" ]]; then
+  # shellcheck source=tools/version.sh
+  source "${SCRIPT_DIR}/tools/version.sh"
+fi
+if ! declare -F netool_print_all_versions >/dev/null 2>&1; then
+  netool_print_all_versions() {
+    printf "netool 懒人工具箱 v%s\n" "$SCRIPT_VERSION"
+  }
+fi
 
 TOOL_EXIT_CODE=0
 SELECTED_ACTION=""
@@ -255,7 +267,7 @@ print_section() {
 }
 
 confirm_license() {
-  if [[ -n "${NETOOL_SKIP_LICENSE:-${AYU_SKIP_LICENSE:-}}" || $# -gt 0 ]]; then
+  if [[ -n "${NETOOL_SKIP_LICENSE:-}" || -n "${AYU_SKIP_LICENSE:-}" || $# -gt 0 ]]; then
     return 0
   fi
 
@@ -390,7 +402,7 @@ run_capability_check() {
   check_command_group "磁盘占用分析" du find || true
 
   printf "\n%s[软件源与 Docker]%s\n" "$COLOR_CYAN" "$COLOR_RESET"
-  check_command_group "LinuxMirrors 换源" apt apt-get dnf yum pacman zypper || true
+  check_command_group "全能换源 (lmirrors)" apt apt-get dnf yum pacman zypper || true
   check_command_group "Homebrew 安装" curl git ruby || true
   check_command_group "Docker 查看" docker || true
 
@@ -398,6 +410,123 @@ run_capability_check() {
   printf "  %s可用%s / %s缺依赖%s / %s需 root%s 三种状态。\n" "$COLOR_GREEN" "$COLOR_RESET" "$COLOR_YELLOW" "$COLOR_RESET" "$COLOR_YELLOW" "$COLOR_RESET"
   printf "  查看类功能缺少少量命令也能降级显示；改系统类功能请先确认备份和目标。\n"
   printf "  硬盘验盘真正执行会全盘写入，必须先预览并输入 DESTROY-DISK-TEST。\n"
+}
+
+status_line() {
+  printf "  %-12s %s\n" "$1" "$2"
+}
+
+status_section() {
+  printf "\n%s[%s]%s\n" "$COLOR_CYAN" "$1" "$COLOR_RESET"
+}
+
+run_status_panel() {
+  detect_os
+
+  printf "\n%s=== netool 状态面板 ===%s\n" "$COLOR_BOLD" "$COLOR_RESET"
+
+  status_section "系统"
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    status_line "发行版" "${PRETTY_NAME:-${NAME:-未知}}"
+  else
+    status_line "发行版" "${OS_NAME:-未知}"
+  fi
+  status_line "内核" "$(uname -r 2>/dev/null || echo 未知)"
+  status_line "架构" "$(uname -m 2>/dev/null || echo 未知)"
+  status_line "主机名" "$(hostname 2>/dev/null || echo 未知)"
+  if command_exists uptime; then
+    status_line "运行时间" "$(uptime -p 2>/dev/null || uptime 2>/dev/null | sed 's/.*up/up/' | sed 's/,.*//')"
+  fi
+  if command_exists free; then
+    status_line "内存" "$(free -h 2>/dev/null | awk '/^Mem:/ {printf "%s 已用 / %s 总量", $3, $2}')"
+  fi
+  if command_exists df; then
+    status_line "根分区" "$(df -h / 2>/dev/null | awk 'NR==2 {printf "%s 已用 %s / %s (%s)", $6, $3, $2, $5}')"
+  fi
+
+  status_section "时间"
+  status_line "当前时间" "$(date '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date)"
+  if command_exists timedatectl; then
+    status_line "时区" "$(timedatectl show -p Timezone --value 2>/dev/null || timedatectl 2>/dev/null | awk '/Time zone/ {print $3}')"
+    status_line "NTP 同步" "$(timedatectl show -p NTPSynchronized --value 2>/dev/null || echo 未知)"
+  elif command_exists chronyc; then
+    status_line "chrony" "$(chronyc tracking 2>/dev/null | awk -F: '/Leap status/ {gsub(/^ +/,"",$2); print $2; exit}')"
+  fi
+
+  status_section "网络"
+  if command_exists ip; then
+    status_line "主 IP" "$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}')"
+  elif command_exists hostname; then
+    status_line "主 IP" "$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  if command_exists ss; then
+    status_line "SSH 监听" "$(ss -tlnp 2>/dev/null | awk '/:22 |:2222 / {print $4; exit}' || echo 未检测到)"
+  fi
+  if command_exists sysctl; then
+    status_line "TCP 拥塞" "$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo 未知)"
+  fi
+
+  status_section "安全"
+  if command_exists ufw && ufw status 2>/dev/null | grep -qi 'Status:'; then
+    status_line "防火墙" "$(ufw status 2>/dev/null | head -n1 | sed 's/Status: //')"
+  elif command_exists firewall-cmd; then
+    status_line "firewalld" "$(firewall-cmd --state 2>/dev/null || echo 未运行)"
+  elif command_exists iptables; then
+    status_line "iptables" "$([[ $(iptables -L -n 2>/dev/null | wc -l) -gt 8 ]] && echo 有规则 || echo 规则较少/空)"
+  else
+    status_line "防火墙" "未检测到 ufw/firewalld/iptables"
+  fi
+  if command_exists fail2ban-client; then
+    status_line "Fail2ban" "$(fail2ban-client ping 2>/dev/null && fail2ban-client status 2>/dev/null | awk -F: '/Number of jail/{gsub(/^ +/,"",$2); print "运行中, jail "$2; exit}' || echo 未运行)"
+  else
+    status_line "Fail2ban" "未安装"
+  fi
+
+  status_section "Docker"
+  if command_exists docker; then
+    if docker info >/dev/null 2>&1; then
+      status_line "服务" "运行中"
+      status_line "容器" "$(docker ps -q 2>/dev/null | wc -l | tr -d ' ') 运行 / $(docker ps -aq 2>/dev/null | wc -l | tr -d ' ') 总计"
+      status_line "镜像" "$(docker images -q 2>/dev/null | sort -u | wc -l | tr -d ' ') 个"
+    else
+      status_line "服务" "已安装但未运行或无权限"
+    fi
+  else
+    status_line "Docker" "未安装"
+  fi
+
+  status_section "工具箱"
+  status_line "版本" "v${SCRIPT_VERSION}"
+  if is_local_deploy; then
+    status_line "部署" "本地 (${SCRIPT_DIR})"
+  else
+    status_line "部署" "远程/管道模式"
+  fi
+  status_line "许可" "$([[ -f "$(netool_license_file "${LICENSE_VERSION}")" ]] && echo 已接受 || echo 未确认)"
+
+  printf "\n%s提示:%s 依赖与命令可用性请运行 ${COLOR_BOLD}./main.sh check${COLOR_RESET}\n" "$COLOR_YELLOW" "$COLOR_RESET"
+}
+
+run_versions_display() {
+  if [[ -f "${SCRIPT_DIR}/tools/versions.env" ]]; then
+    netool_print_all_versions "$SCRIPT_DIR"
+    return 0
+  fi
+  if command_exists curl; then
+    local tmp_root=""
+    tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/netool-ver.XXXXXX" 2>/dev/null || mktemp -d)"
+    mkdir -p "${tmp_root}/tools"
+    if curl -fsSL "${RAW_BASE_URL}/tools/versions.env" -o "${tmp_root}/tools/versions.env" 2>/dev/null; then
+      netool_print_all_versions "$tmp_root"
+      rm -rf "$tmp_root"
+      return 0
+    fi
+    rm -rf "$tmp_root"
+  fi
+  printf "netool 懒人工具箱 v%s\n" "$SCRIPT_VERSION"
+  log_info "完整组件版本列表需本地部署或联网读取 tools/versions.env"
 }
 
 usage() {
@@ -411,6 +540,8 @@ netool懒人工具箱 v${SCRIPT_VERSION}
 
 可用工具：
   check         检查当前服务器对各项功能的依赖满足情况
+  status        一键状态面板（系统/网络/安全/Docker 摘要，只读）
+  versions      显示主版本与各组件版本号
   system        系统信息与基础维护，可追加 info/update/clean/time/users/services
   network       网络信息、端口和连通性检查，可追加 ip/route/ports/ping/dns
   docker        Docker 状态、容器和镜像查看，可追加 status/ps/images/volumes/networks/logs
@@ -444,6 +575,7 @@ netool懒人工具箱 v${SCRIPT_VERSION}
   curl -fsSL ${SHORT_SCRIPT_URL}|bash           # 进入菜单
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) system # 系统信息
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) check  # 功能可用性检查
+  bash <(curl -fsSL ${SHORT_SCRIPT_URL}) status # 一键状态面板
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) init   # 服务器初始化向导
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) -q check  # 静默模式，只输出错误
 
@@ -515,7 +647,8 @@ list_tools() {
   _menu_row "28" "初始化向导" "29" "卸载工具箱"
 
   _menu_section "其他"
-  printf "  ${y}[%2s]${r} 功能检查       ${y}[%2s]${r} 更新脚本\n" "01" "00"
+  printf "  ${y}[%2s]${r} 功能检查       ${y}[%2s]${r} 状态面板\n" "01" "02"
+  printf "  ${y}[%2s]${r} 组件版本       ${y}[%2s]${r} 更新脚本\n" "03" "00"
   printf "  ${y}[%2s]${r} 退出\n" "0"
 
   printf "\n"
@@ -652,6 +785,12 @@ resolve_selection() {
       ;;
     01|check|checkup|doctor|env|health|功能检查|可用性检查|环境检查)
       SELECTED_ACTION="check"
+      ;;
+    02|status|overview|panel|状态|状态面板|概览)
+      SELECTED_ACTION="status"
+      ;;
+    03|versions|version-all|组件版本|版本列表)
+      SELECTED_ACTION="versions"
       ;;
     00|0update|script-update|self-update|update|脚本更新|更新)
       SELECTED_ACTION="update"
@@ -823,7 +962,6 @@ run_tool() {
   if [[ -f "$local_path" ]]; then
     TOOL_EXIT_CODE=0
     export NETOOL=1
-    export AYU_TOOLBOX=1
     export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
     export NETOOL_MAIN_SH="${SCRIPT_DIR}/main.sh"
     if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
@@ -850,7 +988,6 @@ run_tool() {
   fi
 
   export NETOOL=1
-  export AYU_TOOLBOX=1
   export NETOOL_REMOTE=1
   export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
   export NETOOL_COMMON_FILE="${tmp_root}/tools/common.sh"
@@ -950,6 +1087,12 @@ interactive_loop() {
         check)
           run_capability_check || TOOL_EXIT_CODE=$?
           ;;
+        status)
+          run_status_panel || TOOL_EXIT_CODE=$?
+          ;;
+        versions)
+          run_versions_display || TOOL_EXIT_CODE=$?
+          ;;
         init)
           run_init_wizard || TOOL_EXIT_CODE=$?
           ;;
@@ -1017,6 +1160,14 @@ main() {
           ;;
         check)
           run_capability_check
+          exit "$EXIT_OK"
+          ;;
+        status)
+          run_status_panel
+          exit "$EXIT_OK"
+          ;;
+        versions)
+          run_versions_display
           exit "$EXIT_OK"
           ;;
         init)

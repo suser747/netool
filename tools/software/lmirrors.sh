@@ -186,7 +186,7 @@ mirror_list_intranet=(
     "mirrors.ivolces.com"
 )
 
-## 赞助商广告（已移除，保留空数组声明以兼容下游引用）
+## 赞助商广告（已移除）
 SPONSOR_ADS=()
 
 ##############################################################################
@@ -693,65 +693,13 @@ function run_start() {
 }
 
 # 函数名：run_end
-# 功能：脚本运行收尾输出，打印项目官网链接与（若存在）赞助商广告表格
-#       PURE_MODE 为 true 时仅输出空行后返回
-# 参数：无
-# 返回值：始终 0
+# 功能：脚本运行收尾输出，打印项目官网链接
 function run_end() {
     if [[ "${PURE_MODE}" == "true" ]]; then
         echo ''
         return
     fi
     echo -e "\n✨ $(msg "end.moreInfo") 👉 \033[3mhttps://gitee.com/suser747/netool\033[0m"
-    if [[ "${#SPONSOR_ADS[@]}" -gt 0 ]]; then
-        echo -e "\n\033[2m$(msg "end.sponsorAds")\033[0m"
-        _str_width() {
-            local s="$1"
-            shopt -s extglob
-            s="${s//\\033\[+([0-9;])[a-zA-Z]/}"
-            local width=0 i len val
-            local LC_ALL=C
-            len=${#s}
-            for ((i = 0; i < len; )); do
-                printf -v val '%d' "'${s:i:1}"
-                ((val < 0)) && ((val += 256))
-                if ((val < 128)); then
-                    ((width += 1, i += 1))
-                elif ((val < 192)); then
-                    ((i += 1))
-                elif ((val < 224)); then
-                    ((width += 1, i += 2))
-                elif ((val < 240)); then
-                    ((width += 2, i += 3))
-                else
-                    ((width += 2, i += 4))
-                fi
-            done
-            echo $width
-        }
-        local -a _c1 _c2 _c3 _w1 _w2
-        local _max1=0 _max2=0 _w _a _b
-        for _entry in "${SPONSOR_ADS[@]}"; do
-            _a="${_entry%% · *}"
-            _b="${_entry#* · }"
-            _c1+=("$_a")
-            _c2+=("${_b%% ➜  *}")
-            _c3+=("${_b##* ➜  }")
-            _w=$(_str_width "$_a")
-            _w1+=("$_w")
-            [[ $_w -gt $_max1 ]] && _max1=$_w
-            _w=$(_str_width "${_b%% ➜  *}")
-            _w2+=("$_w")
-            [[ $_w -gt $_max2 ]] && _max2=$_w
-        done
-        local _pad1 _pad2
-        for ((_i = 0; _i < ${#SPONSOR_ADS[@]}; _i++)); do
-            sleep 0.1
-            printf -v _pad1 '%*s' $((_max1 - _w1[_i])) ''
-            printf -v _pad2 '%*s' $((_max2 - _w2[_i])) ''
-            echo -e "  \033[2m${_c1[_i]}${_pad1} ${_c2[_i]}${_pad2} ${_c3[_i]}\033[0m"
-        done
-    fi
     echo -e "\n\033[3;1mPowered by \033[34mnetool懒人工具箱\033[0m\n"
 }
 

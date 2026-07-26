@@ -35,7 +35,7 @@ EOF
 }
 
 print_banner() {
-  if [[ -n "${NETOOL:-}${AYU_TOOLBOX:-}" ]]; then return 0; fi
+  if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   print_divider
   printf "netool懒人工具箱 | 服务器初始化向导 v%s\n" "$SCRIPT_VERSION"
   print_divider

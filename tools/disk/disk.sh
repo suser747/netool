@@ -69,7 +69,7 @@ PASSTHROUGH_ARGS=()
 # -----------------------------------------------------------------------------
 on_error() {
   local exit_code=$?
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then
+  if [[ -n "${NETOOL:-}" ]]; then
     log_error "执行失败，退出码：${exit_code}"
   else
     log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
@@ -94,7 +94,7 @@ print_divider() { printf "%s\n" "-----------------------------------------------
 # 返回值: 0 - 始终成功
 # -----------------------------------------------------------------------------
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then return 0; fi
+  if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   print_divider
   printf "netool懒人工具箱 | 磁盘管理 v%s\n" "$SCRIPT_VERSION"
   printf "分区 / 挂载 / 盘位映射 / SMART / 全盘测试 / 擦盘\n"
@@ -969,7 +969,7 @@ parse_args() {
 # 说明: 未指定 ACTION 时进入交互式菜单循环，直到用户选择返回。
 # -----------------------------------------------------------------------------
 main() {
-  ayu_acquire_lock "disk" "另一个 disk 实例正在运行，请等待其完成后再试。" || return 1
+  netool_acquire_lock "disk" "另一个 disk 实例正在运行，请等待其完成后再试。" || return 1
   parse_args "$@"
   print_banner
 

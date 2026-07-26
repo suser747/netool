@@ -34,6 +34,8 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)
 ```bash
 # 功能检查
 bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) check
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) versions
 
 # 系统信息
 bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) system
@@ -66,7 +68,7 @@ main.sh 启动
 
 远程模式下：
 
-- `check`、`update`、`uninstall` 等内置功能**不下载**子脚本
+- `check`、`status`、`versions`、`update`、`uninstall` 等内置功能**不下载**子脚本
 - `mirror`、`disk`、`ssh` 等工具会**按需下载**对应脚本
 - `disk` 的磁盘子脚本（验盘、SMART 等）由 `disk.sh` **二次按需下载**
 - 每次运行拉取 Gitee 上最新代码，**无需手动更新**

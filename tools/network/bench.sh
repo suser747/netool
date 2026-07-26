@@ -75,7 +75,7 @@ EOF
 # 返回值: 0 - 始终成功
 # ------------------------------------------------------------------------------
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then return 0; fi
+  if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   printf "%s\n" "------------------------------------------------------------"
   printf "netool懒人工具箱 | 轻量性能测试 v%s\n" "$SCRIPT_VERSION"
   printf "%s\n" "------------------------------------------------------------"
@@ -125,7 +125,7 @@ do_disk() {
   fi
 
   local tmp_file
-  tmp_file="$(mktemp -t ayu-bench.XXXXXX 2>/dev/null || mktemp)"
+  tmp_file="$(mktemp -t netool-bench.XXXXXX 2>/dev/null || mktemp)"
   printf "\n磁盘轻测:\n"
   printf "  写入 256 MiB 到 %s,完成后自动删除。\n" "$tmp_file"
   # 使用 if 捕获 dd 退出码,避免 set -e 在管道失败时提前退出导致临时文件残留
@@ -164,7 +164,7 @@ do_net() {
 # 返回值: 0 - 成功, 非 0 - 加锁失败或测试错误
 # ------------------------------------------------------------------------------
 main() {
-  ayu_acquire_lock "bench" "另一个 bench 实例正在运行,请等待其完成后再试。" || return 1
+  netool_acquire_lock "bench" "另一个 bench 实例正在运行,请等待其完成后再试。" || return 1
 
   local action="all"
 

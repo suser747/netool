@@ -433,7 +433,7 @@ print_kv() {
 # 参数: 无
 # 返回值: 始终 0
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then
+  if [[ -n "${NETOOL:-}" ]]; then
     return 0
   fi
 
@@ -655,7 +655,7 @@ die() {
 # 返回值: 无（以原退出码退出）
 on_error() {
   local exit_code=$?
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then
+  if [[ -n "${NETOOL:-}" ]]; then
     log_error "执行失败，退出码：${exit_code}"
   else
     log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
@@ -2195,7 +2195,7 @@ perform_switch() {
 # 返回值: 0 - 成功; 非 0 - 刷新失败或用户取消
 # 说明: 恢复路径不修改源文件结构，仅将备份文件按原绝对路径覆盖
 main() {
-  ayu_acquire_lock "mirror" "另一个 mirror 实例正在运行，请等待其完成后再试。" || return 1
+  netool_acquire_lock "mirror" "另一个 mirror 实例正在运行，请等待其完成后再试。" || return 1
   local restore_dir=""
 
   parse_args "$@"

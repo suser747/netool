@@ -32,6 +32,8 @@ cd netool && bash main.sh
 | 命令 | 说明 |
 |------|------|
 | `check` | 检查依赖与功能可用性 |
+| `status` | 一键状态面板（只读摘要） |
+| `versions` | 查看主版本与各组件版本 |
 | `system` | 系统信息与维护 |
 | `mirror` / `lmirrors` | 轻量换源 / 全能换源 |
 | `ssh` | SSH 端口管理（支持 staged 模式） |
@@ -45,7 +47,10 @@ cd netool && bash main.sh
 
 ```
 main.sh                 # 统一入口
+VERSION                 # 主版本号
 tools/common.sh         # 公共函数库
+tools/versions.env      # 各组件版本号
+tools/version.sh        # 版本展示函数
 tools/system/           # 系统维护
 tools/network/          # 网络工具
 tools/security/         # 安全与用户
@@ -76,4 +81,4 @@ bash scripts/validate.sh    # 本地语法检查 + 冒烟测试
 
 ## License
 
-[MIT](./LICENSE)
+[Apache License 2.0](./LICENSE)

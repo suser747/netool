@@ -22,7 +22,7 @@ NETOOL_ENTRY_URL="${NETOOL_RAW_BASE}/main.sh"
 NETOOL_LEGACY_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME:-}/.config}/ayu-toolbox"
 NETOOL_LEGACY_LOG_DIR="/var/log/netool"
 
-# 工具箱内部调用标记（兼容旧变量 AYU_TOOLBOX）
+# 工具箱内部调用标记（legacy: AYU_TOOLBOX 同步为 NETOOL，供旧环境变量兼容）
 NETOOL="${NETOOL:-${AYU_TOOLBOX:-}}"
 AYU_TOOLBOX="${AYU_TOOLBOX:-$NETOOL}"
 
@@ -73,7 +73,7 @@ netool_acquire_lock() {
 }
 
 # 兼容旧函数名
-ayu_acquire_lock() { netool_acquire_lock "$@"; }
+netool_acquire_lock() { netool_acquire_lock "$@"; }
 
 netool_config_dir() {
   if [[ -d "$NETOOL_CONFIG_DIR" || ! -d "$NETOOL_LEGACY_CONFIG_DIR" ]]; then
@@ -105,7 +105,7 @@ COLOR_CYAN=""
 COLOR_BOLD=""
 COLOR_RESET=""
 
-if [[ -t 1 && -z "${NETOOL:-}" && -z "${AYU_TOOLBOX:-}" ]]; then
+if [[ -t 1 && -z "${NETOOL:-}" ]]; then
   COLOR_RED=$'\033[31m'
   COLOR_GREEN=$'\033[32m'
   COLOR_YELLOW=$'\033[33m'
@@ -125,7 +125,7 @@ die()         { log_error "$*"; exit 1; }
 
 on_error() {
   local exit_code=$?
-  if [[ -n "${NETOOL:-}" || -n "${AYU_TOOLBOX:-}" ]]; then
+  if [[ -n "${NETOOL:-}" ]]; then
     log_error "执行失败，退出码：${exit_code}"
   else
     log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"

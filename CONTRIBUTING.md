@@ -8,12 +8,13 @@
 ## 新增工具规范
 
 1. 脚本放在 `tools/<分类>/` 下
-2. 头部声明 `SCRIPT_NAME`、`SCRIPT_VERSION`，使用 `set -Eeuo pipefail`
-3. 引入公共库：
+2. 头部声明 `SCRIPT_NAME`、`SCRIPT_VERSION`，并在 `tools/versions.env` 登记对应 `tool_id=version`
+3. 使用 `set -Eeuo pipefail`
+4. 引入公共库：
 
 ```bash
-# shellcheck source=../common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
+# shellcheck source=../load_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 trap on_error ERR
 ```
 

@@ -70,12 +70,12 @@ trap on_error ERR
 
 # ------------------------------------------------------------------------------
 # 函数: print_banner
-# 功能: 打印脚本横幅; 被 AYU_TOOLBOX 调用时不打印
+# 功能: 打印脚本横幅; 被 NETOOL 主入口调用时不打印
 # 参数: 无
 # 返回值: 0 - 始终成功
 # ------------------------------------------------------------------------------
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then
+  if [[ -n "${NETOOL:-}" ]]; then
     return 0
   fi
 
@@ -1664,7 +1664,7 @@ interactive_menu() {
 # 返回值: 透传子流程退出码
 # ------------------------------------------------------------------------------
 entry() {
-  ayu_acquire_lock "ssh-port" "另一个 ssh-port 实例正在运行,请等待其完成后再试。" || return 1
+  netool_acquire_lock "ssh-port" "另一个 ssh-port 实例正在运行,请等待其完成后再试。" || return 1
   parse_args "$@"
 
   if [[ -n "$NEW_PORT" || -n "$MODE" || "$ACTION" != "configure" ]] || (( NON_INTERACTIVE )); then

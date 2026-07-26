@@ -1056,7 +1056,7 @@ generate_report() {
 main() {
     # shellcheck source=../load_common.sh
     source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
-    ayu_acquire_lock "disk-test" "另一个 disk-test 实例正在运行，请等待其完成后再试。" || exit 1
+    netool_acquire_lock "disk-test" "另一个 disk-test 实例正在运行，请等待其完成后再试。" || exit 1
 
     if [[ "$PLAN_ONLY" != "1" ]]; then
         log "输出目录: $OUT_BASE"

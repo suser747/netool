@@ -10,13 +10,20 @@ cleanup() { rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 
 cp "${ROOT}/main.sh" "${WORKDIR}/main.sh"
+cp "${ROOT}/VERSION" "${WORKDIR}/VERSION"
 mkdir -p "${WORKDIR}/tools"
 cp "${ROOT}/tools/common.sh" "${WORKDIR}/tools/common.sh"
 cp "${ROOT}/tools/load_common.sh" "${WORKDIR}/tools/load_common.sh"
+cp "${ROOT}/tools/version.sh" "${WORKDIR}/tools/version.sh"
+cp "${ROOT}/tools/versions.env" "${WORKDIR}/tools/versions.env"
 cd "$WORKDIR"
 
 echo "==> 远程模式模拟目录: ${WORKDIR}"
 echo "    （保留 main.sh + common.sh，子工具从 Gitee 在线下载）"
+echo "==> 测试 status / versions（内置）"
+bash main.sh status >/dev/null || { echo "FAIL: status"; exit 1; }
+bash main.sh versions >/dev/null || { echo "FAIL: versions"; exit 1; }
+
 echo "==> 测试 check（内置，无需下载子脚本）"
 bash main.sh check >/dev/null || { echo "FAIL: check"; exit 1; }
 

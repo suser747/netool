@@ -61,7 +61,7 @@ EOF
 # 参数：无
 # 返回值：0 - 始终成功
 print_banner() {
-  if [[ -n "${AYU_TOOLBOX:-}" ]]; then return 0; fi
+  if [[ -n "${NETOOL:-}" ]]; then return 0; fi
   printf "%s\n" "------------------------------------------------------------"
   printf "netool懒人工具箱 | HTTPS 证书到期检查 v%s\n" "$SCRIPT_VERSION"
   printf "%s\n" "------------------------------------------------------------"
@@ -213,7 +213,7 @@ load_targets_from_file() {
 # 参数：$@ - 命令行参数（域名/IP 与选项）
 # 返回值：0 - 成功, 非 0 - 加锁失败或检查错误
 main() {
-  ayu_acquire_lock "ssl-check" "另一个 ssl-check 实例正在运行，请等待其完成后再试。" || return 1
+  netool_acquire_lock "ssl-check" "另一个 ssl-check 实例正在运行，请等待其完成后再试。" || return 1
 
   local file=""
 

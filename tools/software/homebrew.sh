@@ -98,9 +98,9 @@ tty_cyan="$(tty_universal 36)"            # 青色：信息提示
 tty_reset="$(tty_escape 0)"               # 重置所有属性
 
 # netool懒人工具箱调用时抑制颜色输出（与项目其它脚本一致）
-# 当通过 main.sh 调用时，AYU_TOOLBOX 环境变量会被设置，
+# 当通过 main.sh 调用时 NETOOL=1，
 # 此时禁用所有颜色转义，保证输出在日志/管道中干净可读
-if [[ -n "${AYU_TOOLBOX:-}" ]]; then
+if [[ -n "${NETOOL:-}" ]]; then
   tty_escape() { :; }
   tty_underline=""
   tty_blue=""
