@@ -589,7 +589,7 @@ netool懒人工具箱 v${SCRIPT_VERSION}
   直接运行不带工具名时进入菜单选择。
   传入工具名时，后续参数原样转交给对应脚本。
   本地部署时无需 curl，直接运行 main.sh 即可。
-  完整使用说明见 USAGE.md；curl 远程详见 REMOTE_USAGE.md。
+  完整使用说明见 README.md。
   两个换源工具区别：mirror 轻量带备份；lmirrors 功能全支持更多发行版+Docker。
 EOF
 }

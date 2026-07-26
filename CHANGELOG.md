@@ -13,7 +13,7 @@
 
 ### 新增
 
-- [REMOTE_USAGE.md](./REMOTE_USAGE.md) 远程 curl 使用完整说明
+- 完整使用说明已整合至 [README.md](./README.md)（含 curl 远程、本地部署、分系统教程、许可协议、贡献指南）
 - `scripts/test-remote.sh` 远程模式自动化测试
 
 ### 优化
