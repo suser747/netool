@@ -482,7 +482,7 @@ run_status_panel() {
   if command_exists ip; then
     status_line "主 IP" "$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}')"
   elif command_exists hostname; then
-    status_line "主 IP" "$(hostname -I 2>/dev/null | awk '{print $1}')"
+    status_line "主 IP" "$(hostname -I 2>/dev/null | awk '{print $1}' || echo 未知)"
   fi
   if command_exists ss; then
     status_line "SSH 监听" "$(ss -tlnp 2>/dev/null | awk '/:22 |:2222 / {print $4; exit}' || echo 未检测到)"

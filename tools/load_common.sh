@@ -11,7 +11,7 @@
 # =============================================================================
 
 # 已被 common.sh source 过时直接返回，避免重复初始化
-[[ -n "${NETOOL_COMMON_SOURCED:-}" ]] && return 0 2>/dev/null || exit 0
+[[ -n "${NETOOL_COMMON_SOURCED:-}" ]] && return 0
 
 # 远程模式：main.sh 预先下载 common 到临时目录并导出路径
 if [[ -n "${NETOOL_COMMON_FILE:-}" && -f "$NETOOL_COMMON_FILE" ]]; then
