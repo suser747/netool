@@ -36,12 +36,19 @@ fi
 echo "==> 冒烟测试"
 export NETOOL_SKIP_LICENSE=1
 export NETOOL_SKIP_LOCALE_TIP=1
+export NETOOL_ALLOW_PIPE_MENU=1
 bash main.sh --version >/dev/null || fail=1
 bash main.sh status >/dev/null || fail=1
 bash main.sh versions >/dev/null || fail=1
 bash main.sh check >/dev/null || fail=1
 bash main.sh mirror --version >/dev/null || fail=1
 bash main.sh user list >/dev/null || fail=1
+bash main.sh web status >/dev/null || fail=1
+bash main.sh db status >/dev/null || fail=1
+bash main.sh audit all >/dev/null || fail=1
+bash main.sh app-config scan --path /tmp >/dev/null || fail=1
+bash main.sh logs usage >/dev/null || fail=1
+bash main.sh cron-templates list >/dev/null || fail=1
 
 echo "==> 远程模式模拟"
 bash scripts/test-remote.sh >/dev/null || fail=1

@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.3.0] - 2026-07-27
+
+### 新增
+
+- **应用 / 中间件** 全栈模块（`tools/apps/`）：
+  - `web` — Nginx/Apache/Caddy 状态与配置检查
+  - `db` — MySQL/PG/Redis 状态与配置（只读，不回显密码）
+  - `app-config` — Compose/.env/Supervisor 扫描与权限审计
+  - `audit` — 用户/sudo/SSH/文件权限只读审计
+  - `logs` — 日志占用、ERROR tail、监控 agent、logrotate 提示
+  - `cron-templates` — cert-renew / disk-alert / log-truncate 模板
+
+### 菜单
+
+- 重组主菜单：应用运维 20–25、软件源 26–28、快捷 29–31
+- `validate.sh` / `test-remote.sh` 增加新模块冒烟测试
+
+## [2.2.0] - 2026-07-27
+
+### 交互
+
+- 主菜单改为**大类入口**（选编号进入子脚本二级菜单）
+- 执行前反馈、完成后 Enter 返回；统一导航说明（主菜单 `0` 退出 · 子菜单 `b` 返回）
+- 非 TTY stdin 警告并提示 `bash <(curl ...)`；菜单 25 / CLI `update`·`self-update` 更新工具箱
+
+### 功能
+
+- 实现 `-y/--yes`、`-q/--quiet` 并 export 至子工具（`NON_INTERACTIVE` / `QUIET`）
+- 远程子脚本可选缓存 `~/.cache/netool/`（`NETOOL_NO_CACHE=1` 禁用）
+
+### 工程
+
+- 子脚本移除重复的 `require_root` / `confirm_*` / `on_error`（统一 common.sh）
+- 新增 `USER_AGREEMENT.md`、`CONTRIBUTING.md`、`docs/ROADMAP.md`
+- 新增 `scripts/check-versions.sh` 版本一致性校验
+- 在线入口 URL 与 README 短链统一（`NETOOL_SHORT_ENTRY_URL`）
+
 ## [2.1.1] - 2026-07-27
 
 ### 修复

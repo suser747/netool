@@ -66,26 +66,6 @@ DRY_RUN=0
 ACTION=""
 PASSTHROUGH_ARGS=()
 
-
-# -----------------------------------------------------------------------------
-# 函数: on_error
-# 功能: set -e ERR trap 回调，打印失败行号与退出码后退出
-# 参数: 无 (通过 $? 获取退出码)
-# 返回值: 不返回 (脚本以原退出码退出)
-# 说明: 被工具箱调用时只输出简短错误，避免污染主控日志。
-# -----------------------------------------------------------------------------
-on_error() {
-  local exit_code=$?
-  if [[ -n "${NETOOL:-}" ]]; then
-    log_error "执行失败，退出码：${exit_code}"
-  else
-    log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  fi
-  exit "$exit_code"
-}
-
-trap on_error ERR
-
 # -----------------------------------------------------------------------------
 # 函数: print_divider
 # 功能: 打印一条横线分隔符
@@ -108,47 +88,8 @@ print_banner() {
   print_divider
 }
 
-# -----------------------------------------------------------------------------
-# 函数: require_root
-# 功能: 校验当前是否以 root 身份运行，否则 die 退出
-# 参数: 无
-# 返回值: 0 - 是 root；不返回 - 非 root 时脚本以退出码 1 退出
-# -----------------------------------------------------------------------------
-require_root() {
-  if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-    die "需要 root 权限运行，请在命令前加 sudo。"
-  fi
-}
 
-# -----------------------------------------------------------------------------
-# 函数: confirm_default_no
-# 功能: 默认否定的确认提示，需用户显式输入 y/yes/是/确认 才返回成功
-# 参数: $1 - 提示文本
-# 返回值: 0 - 用户确认；1 - 用户拒绝或读取失败
-# 说明: 非交互模式 (NON_INTERACTIVE=1) 直接返回 0 表示已默认确认。
-# -----------------------------------------------------------------------------
-confirm_default_no() {
-  local prompt="$1"
-  local answer=""
-  if (( NON_INTERACTIVE )); then return 0; fi
-  read_prompt "${prompt} [y/N]: " answer || return 1
-  [[ "$answer" =~ ^([yY]|[yY][eE][sS]|是|确认)$ ]]
-}
 
-# -----------------------------------------------------------------------------
-# 函数: confirm_default_yes
-# 功能: 默认肯定的确认提示，用户输入 n/no/否 才返回失败
-# 参数: $1 - 提示文本
-# 返回值: 0 - 用户确认 (或非交互)；1 - 用户拒绝
-# 说明: 非交互模式 (NON_INTERACTIVE=1) 直接返回 0。
-# -----------------------------------------------------------------------------
-confirm_default_yes() {
-  local prompt="$1"
-  local answer=""
-  if (( NON_INTERACTIVE )); then return 0; fi
-  read_prompt "${prompt} [Y/n]: " answer || return 1
-  [[ ! "$answer" =~ ^([nN]|[nN][oO]|否)$ ]]
-}
 
 # -----------------------------------------------------------------------------
 # 函数: usage
@@ -996,6 +937,7 @@ main() {
     printf "  5. 硬盘好坏检测/验盘（全盘写入，会清空被测盘）\n"
     printf "  6. 擦盘预览（真正执行需命令行指定 --devices）\n"
     printf "  b. 返回\n"
+    print_menu_nav_hint
     if ! read_prompt "输入编号： " answer; then
       log_error "无法读取输入。请改用：bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) disk <操作>"
       return 1

@@ -38,4 +38,16 @@ bash main.sh network ip >/dev/null || { echo "FAIL: network ip"; exit 1; }
 echo "==> 测试 user list"
 bash main.sh user list >/dev/null || { echo "FAIL: user list"; exit 1; }
 
+echo "==> 测试 web status（远程下载 apps/web.sh）"
+if bash main.sh web status >/dev/null 2>&1; then
+  echo "    web status: ok (remote)"
+elif [[ -d "${ROOT}/tools/apps" ]]; then
+  cp -R "${ROOT}/tools/apps" "${WORKDIR}/tools/"
+  bash main.sh web status >/dev/null || { echo "FAIL: web status (local fallback)"; exit 1; }
+  echo "    web status: ok (本地 apps 回退，推送 Gitee 后将走远程下载)"
+else
+  echo "FAIL: web status"
+  exit 1
+fi
+
 echo "==> 全部远程模式测试通过"

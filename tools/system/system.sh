@@ -259,6 +259,7 @@ interactive_loop() {
     printf "  5. 查看登录用户\n"
     printf "  6. 查看运行服务\n"
     printf "  b. 返回\n"
+    print_menu_nav_hint
     if ! read_prompt "输入编号： " answer; then
       log_error "无法读取输入。"
       return 1

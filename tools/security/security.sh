@@ -53,15 +53,6 @@ DRY_RUN=0
 JAIL_FILE="/etc/fail2ban/jail.d/netool-sshd.conf"
 
 
-# ------------------------------------------------------------------------------
-# 函数: require_root
-# 功能: 校验当前是否以 root 身份运行；非 root 直接 die
-# 参数: 无
-# 返回值: root 时返回 0，否则退出 1
-# ------------------------------------------------------------------------------
-require_root() {
-  [[ ${EUID:-$(id -u)} -eq 0 ]] || die "该操作需要 root 权限。"
-}
 
 # ------------------------------------------------------------------------------
 # 函数: confirm
@@ -354,6 +345,7 @@ interactive_loop() {
     printf "  3. 安装 Fail2ban\n"
     printf "  4. 启用 SSH 防护\n"
     printf "  b. 返回\n"
+    print_menu_nav_hint
     if ! read_prompt "输入编号: " answer; then
       log_error "无法读取输入。"
       return 1

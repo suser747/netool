@@ -656,19 +656,6 @@ die() {
   exit 1
 }
 
-# 函数: on_error
-# 功能: ERR 信号陷阱函数，捕获命令执行失败时的行号与退出码
-# 参数: 无（通过 $BASH_LINENO 与 $? 获取上下文）
-# 返回值: 无（以原退出码退出）
-on_error() {
-  local exit_code=$?
-  if [[ -n "${NETOOL:-}" ]]; then
-    log_error "执行失败，退出码：${exit_code}"
-  else
-    log_error "脚本在第 ${BASH_LINENO[0]:-unknown} 行附近执行失败，退出码：${exit_code}"
-  fi
-  exit "$exit_code"
-}
 
 trap on_error ERR
 
@@ -1251,15 +1238,6 @@ run_cmd() {
   "$@"
 }
 
-# 函数: require_root
-# 功能: 检查当前是否以 root 身份运行，否则 die
-# 参数: 无
-# 返回值: 无（非 root 时 die 退出码 1）
-require_root() {
-  if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-    die "$(text error_need_root)"
-  fi
-}
 
 # 函数: confirm
 # 功能: 向用户展示 Y/N 确认提示；NON_INTERACTIVE 模式下自动通过
@@ -2302,6 +2280,7 @@ interactive_menu() {
     printf "  3. 查看备份列表\n"
     printf "  4. 查看支持的镜像站\n"
     printf "  b. 返回\n"
+    print_menu_nav_hint
     if ! read_prompt "输入编号： " answer; then
       if is_lang_en; then
         log_error "Unable to read input."

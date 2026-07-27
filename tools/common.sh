@@ -24,7 +24,10 @@ NETOOL_LOG_DIR="/var/log/${NETOOL_CONFIG_NAME}"
 NETOOL_REPO_URL="https://gitee.com/suser747/netool"
 NETOOL_RAW_BRANCH="${NETOOL_RAW_BRANCH:-master}"
 NETOOL_RAW_BASE="${NETOOL_REPO_URL}/raw/${NETOOL_RAW_BRANCH}"
-NETOOL_ENTRY_URL="${NETOOL_RAW_BASE}/main.sh"
+NETOOL_ENTRY_URL="${NETOOL_ENTRY_URL:-${NETOOL_RAW_BASE}/main.sh}"
+NETOOL_SHORT_ENTRY_URL="${NETOOL_SHORT_ENTRY_URL:-https://gitee.com/suser747/netool/raw/m/i}"
+NETOOL_CACHE_DIR="${NETOOL_CACHE_DIR:-${HOME:-/tmp}/.cache/netool}"
+NETOOL_CACHE_TTL="${NETOOL_CACHE_TTL:-86400}"
 
 # 兼容旧版 ayu-toolbox 配置目录（读取许可、迁移时使用）
 NETOOL_LEGACY_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME:-}/.config}/ayu-toolbox"
@@ -140,6 +143,7 @@ if [[ -t 1 && -z "${NETOOL:-}" ]]; then
 fi
 
 QUIET="${QUIET:-0}"
+NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
 log_info()    { (( QUIET == 1 )) || printf "%s%s[信息]%s %s\n" "$COLOR_BOLD" "$COLOR_CYAN" "$COLOR_RESET" "$*"; }
 log_success() { (( QUIET == 1 )) || printf "%s%s[完成]%s %s\n" "$COLOR_BOLD" "$COLOR_GREEN" "$COLOR_RESET" "$*"; }
@@ -182,6 +186,56 @@ read_prompt() {
 }
 
 print_divider() { printf "%s%s%s\n" "$COLOR_CYAN" "------------------------------------------------------------" "$COLOR_RESET"; }
+
+# print_menu_nav_hint — 子菜单底部统一导航说明
+print_menu_nav_hint() {
+  (( QUIET == 1 )) && return 0
+  printf "\n%s导航:%s 子菜单 ${COLOR_BOLD}b${COLOR_RESET} 返回 · 主菜单 ${COLOR_BOLD}0${COLOR_RESET} 退出\n" \
+    "$COLOR_YELLOW" "$COLOR_RESET"
+}
+
+# print_main_menu_nav_hint — 主菜单底部导航
+print_main_menu_nav_hint() {
+  (( QUIET == 1 )) && return 0
+  printf "\n%s导航:%s 输入编号进入子菜单 · ${COLOR_BOLD}0${COLOR_RESET} 退出 · 子菜单内 ${COLOR_BOLD}b${COLOR_RESET} 返回\n" \
+    "$COLOR_YELLOW" "$COLOR_RESET"
+}
+
+# netool_print_action_start — 菜单执行前反馈
+netool_print_action_start() {
+  local label="$1"
+  local detail="${2:-}"
+  if [[ -n "$detail" ]]; then
+    log_info "正在执行: ${label} (${detail}) ..."
+  else
+    log_info "正在执行: ${label} ..."
+  fi
+}
+
+# netool_pause_menu — 执行完成后等待 Enter 返回菜单
+netool_pause_menu() {
+  [[ "${NON_INTERACTIVE:-0}" == "1" ]] && return 0
+  (( QUIET == 1 )) && return 0
+  local _pause=""
+  read_prompt "按 Enter 返回主菜单... " _pause || true
+}
+
+# netool_cache_path REL — 远程脚本本地缓存路径
+netool_cache_path() {
+  local rel="$1"
+  printf '%s/%s/%s' "$NETOOL_CACHE_DIR" "${NETOOL_RAW_BRANCH:-master}" "$rel"
+}
+
+# netool_cache_fresh FILE — 缓存是否在 TTL 内
+netool_cache_fresh() {
+  local file="$1"
+  local ttl="${NETOOL_CACHE_TTL:-86400}"
+  [[ -f "$file" ]] || return 1
+  local now mt
+  now=$(date +%s 2>/dev/null || echo 0)
+  mt=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null || echo 0)
+  (( now - mt < ttl ))
+}
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 

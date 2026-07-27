@@ -162,10 +162,6 @@ confirm() {
   [[ "$answer" =~ ^([yY]|[yY][eE][sS]|是|确认)$ ]]
 }
 
-## 校验当前用户为 root，否则终止脚本
-require_root() {
-  [[ ${EUID:-$(id -u)} -eq 0 ]] || die "该操作需要 root 权限。"
-}
 
 ## 打印 Docker 安装计划（仅展示，不执行）
 ## 参数1: 包管理器名称（apt/dnf/yum/apk/pacman/zypper）
@@ -435,6 +431,7 @@ interactive_loop() {
     printf "  5. 查看网络\n"
     printf "  6. 查看容器日志\n"
     printf "  b. 返回\n"
+    print_menu_nav_hint
     if ! read_prompt "输入编号： " answer; then
       log_error "无法读取输入。"
       return 1

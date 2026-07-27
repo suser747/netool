@@ -4,7 +4,7 @@
 # =============================================================================
 # 项目名称: netool懒人工具箱 (netool)
 # 脚本名称: main
-# 脚本版本: 2.1
+# 脚本版本: 2.2
 # 项目地址: https://gitee.com/suser747/netool
 #
 # 功能说明:
@@ -34,11 +34,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="netool"
-REPO_URL="https://gitee.com/suser747/netool"
-SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
-SHORT_SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/main.sh"
-RAW_BASE_URL="https://gitee.com/suser747/netool/raw/master"
-AGREEMENT_URL="https://gitee.com/suser747/netool/blob/master/USER_AGREEMENT.md"
+REPO_URL="${NETOOL_REPO_URL:-https://gitee.com/suser747/netool}"
 LICENSE_VERSION="1"
 LOG_DIR="/var/log/netool"
 EXIT_OK=0
@@ -55,7 +51,7 @@ else
 fi
 
 SCRIPT_VERSION="$(head -n1 "${SCRIPT_DIR}/VERSION" 2>/dev/null | tr -d '[:space:]')"
-SCRIPT_VERSION="${SCRIPT_VERSION:-2.1}"
+SCRIPT_VERSION="${SCRIPT_VERSION:-2.3}"
 
 # =============================================================================
 # 公共库 bootstrap：本地 tools/common.sh 优先；纯 curl 模式则临时下载
@@ -84,6 +80,12 @@ else
 fi
 trap on_error ERR
 trap '[[ -n "${NETOOL_BOOTSTRAP_DIR:-}" ]] && rm -rf "$NETOOL_BOOTSTRAP_DIR"' EXIT
+
+# 与 common.sh / README 统一的在线入口（短链用于用户复制，raw/master 用于子脚本下载）
+SHORT_SCRIPT_URL="${NETOOL_SHORT_ENTRY_URL}"
+RAW_BASE_URL="${NETOOL_RAW_BASE}"
+SCRIPT_URL="${NETOOL_ENTRY_URL}"
+AGREEMENT_URL="${NETOOL_REPO_URL}/blob/${NETOOL_RAW_BRANCH}/USER_AGREEMENT.md"
 
 if [[ -f "${SCRIPT_DIR}/tools/version.sh" ]]; then
   # shellcheck source=tools/version.sh
@@ -418,6 +420,13 @@ run_capability_check() {
   check_command_group "盘位映射辅助" udevadm readlink find || true
   check_command_group "磁盘占用分析" du find || true
 
+  printf "\n%s[应用 / 中间件]%s\n" "$COLOR_CYAN" "$COLOR_RESET"
+  check_command_group "Web 服务器检查" nginx apache2 httpd caddy || true
+  check_command_group "数据库客户端" mysql psql redis-cli || true
+  check_command_group "应用配置扫描" find docker || true
+  check_command_group "权限审计" awk visudo || true
+  check_command_group "日志查看" journalctl tail || true
+
   printf "\n%s[软件源与 Docker]%s\n" "$COLOR_CYAN" "$COLOR_RESET"
   check_command_group "全能换源 (lmirrors)" apt apt-get dnf yum pacman zypper || true
   check_command_group "Homebrew 安装" curl git ruby || true
@@ -588,17 +597,26 @@ netool懒人工具箱 v${SCRIPT_VERSION}
   lmirrors      全能换源 + Docker 安装（支持更多发行版）
   init          服务器初始化向导（新服务器一键配置）
   uninstall     一键卸载 netool 懒人工具箱
-  update        脚本更新说明/本地仓库拉取
+  update        更新 netool 工具箱（别名 self-update）
+  self-update   同 update
   logclean      日志/缓存/旧内核清理，查看 journald、/var/log、包缓存占用
   user          用户与 SSH 密钥管理，增删用户、上传公钥、禁用密码登录
   cron          定时任务管理，crontab 备份恢复、systemd timer 一览
   ssl-check     HTTPS 证书到期检查，支持多域名批量扫描
   ntp           时间同步管理，配置 chrony/时区，立即同步
   du-analyze    磁盘占用分析，找出大目录和大文件
+  web           Web 服务器 (Nginx/Apache/Caddy) 配置检查
+  db            数据库状态与配置查看 (MySQL/PG/Redis)
+  app-config    应用配置扫描 (Compose/.env/Supervisor)
+  audit         用户/权限/sudo/SSH 只读审计
+  logs          日志占用与监控 agent 查看
+  cron-templates 常用 crontab 模板 (cert-renew/disk-alert 等)
 
 示例：
   curl -fsSL ${SHORT_SCRIPT_URL}|bash           # 进入菜单
-  bash <(curl -fsSL ${SHORT_SCRIPT_URL}) system # 系统信息
+  bash <(curl -fsSL ${SHORT_SCRIPT_URL}) system info   # 指定子命令
+  bash <(curl -fsSL ${SHORT_SCRIPT_URL}) system        # 进入系统工具子菜单
+  bash <(curl -fsSL ${SHORT_SCRIPT_URL}) self-update   # 更新工具箱
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) check  # 功能可用性检查
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) status # 一键状态面板
   bash <(curl -fsSL ${SHORT_SCRIPT_URL}) init   # 服务器初始化向导
@@ -619,24 +637,20 @@ netool懒人工具箱 v${SCRIPT_VERSION}
 EOF
 }
 
-# 打印 --list 工具分类与别名列表
+# 打印 --list 工具分类与别名列表（主菜单：大类 → 子脚本内二级菜单）
 list_tools() {
   local b="${COLOR_BOLD}${COLOR_CYAN}"
   local r="${COLOR_RESET}"
   local y="${COLOR_YELLOW}"
 
   _menu_row() {
-    # 每行最多 4 个选项；不足 4 个时右侧留空
-    # 参数成对传入: num1 label1 num2 label2 num3 label3 num4 label4
-    local out=""
-    local piece
-    local i
+    local out="" piece i
     for ((i = 1; i <= 7; i += 2)); do
       if [[ -n "${!i:-}" ]]; then
         local n="${!i}"
         local lbl_idx=$((i + 1))
         local lbl="${!lbl_idx:-}"
-        printf -v piece "  ${b}[%2s]${r} %-10s" "$n" "$lbl"
+        printf -v piece "  ${b}[%2s]${r} %-12s" "$n" "$lbl"
         out+="$piece"
       fi
     done
@@ -647,188 +661,364 @@ list_tools() {
     printf "\n%s── %s %s\n" "$b" "$1" "$r"
   }
 
-  _menu_section "系统查看"
-  _menu_row "1"  "系统信息"   "2"  "时间/用户"  "3"  "运行服务"  "4"  "主机/时区"
-  _menu_row "5"  "进程/服务"   "6"  "磁盘占用"   ""  ""          ""  ""
+  _menu_section "常用"
+  _menu_row "01" "功能检查"   "02" "状态面板"   "03" "组件版本"   "" ""
 
-  _menu_section "系统维护"
-  _menu_row "7"  "系统更新*"  "8"  "系统清理*"  "9"  "基础工具"   "10" "Swap 管理"
-  _menu_row "11" "日志清理"   "12" "时间同步"   ""  ""          ""  ""
+  _menu_section "系统"
+  _menu_row "1"  "系统工具"   "2"  "主机/时区"  "3"  "进程/服务"  "4"  "磁盘占用"
+  _menu_row "5"  "基础工具"   "6"  "Swap 管理"  "7"  "日志清理"   "8"  "时间同步"
 
   _menu_section "网络"
-  _menu_row "13" "网络端口"   "14" "DNS 测试"  "15" "Ping 测试"  "16" "性能测试"
-  _menu_row "17" "SSH 管理"   "18" "BBR 优化"  "19" "防火墙"     "20" "证书检查"
+  _menu_row "9"  "网络工具"   "10" "性能测试"   "11" "SSH 管理"   "12" "BBR 优化"
+  _menu_row "13" "防火墙"     "14" "证书检查"   ""  ""          ""  ""
 
-  _menu_section "Docker"
-  _menu_row "21" "容器状态"   "22" "镜像/卷"   "23" "安装 Docker" ""  ""
+  _menu_section "Docker / 磁盘"
+  _menu_row "15" "Docker"     "16" "磁盘管理"   ""  ""          ""  ""
 
-  _menu_section "磁盘硬件"
-  _menu_row "24" "磁盘管理"   "25" "盘位映射"  "26" "验盘检测!"  "27" "SMART 长测"
+  _menu_section "安全"
+  _menu_row "17" "Fail2ban"   "18" "用户管理"   "19" "定时任务"   ""  ""
 
-  _menu_section "用户安全"
-  _menu_row "28" "Fail2ban"   "29" "用户管理"  "30" "定时任务"   ""  ""
+  _menu_section "应用 / 中间件"
+  _menu_row "20" "Web 服务器" "21" "数据库"     "22" "应用配置"   "23" "日志监控"
+  _menu_row "24" "权限审计"   "25" "定时模板"   ""  ""          ""  ""
 
   _menu_section "软件源"
-  _menu_row "31" "轻量换源"   "32" "Homebrew" "33" "全能换源"   ""  ""
+  _menu_row "26" "轻量换源"   "27" "Homebrew"   "28" "全能换源"   ""  ""
 
-  _menu_section "快捷工具"
-  _menu_row "34" "初始化"     "35" "卸载工具箱" ""  ""          ""  ""
+  _menu_section "快捷"
+  _menu_row "29" "初始化"     "30" "卸载工具箱" "31" "更新工具箱" ""  ""
 
-  _menu_section "其他"
-  _menu_row "36" "功能检查"   "37" "状态面板"  "38" "组件版本"   "39" "更新脚本"
   _menu_row "0"  "退出"       ""  ""          ""  ""           ""  ""
 
   printf "\n"
-  printf "%s说明:${r} *仅提示命令  !毁数据  不确定请先输入 ${b}36${r}\n" "$y"
+  printf "%s说明:${r} 选编号进入对应工具的子菜单；不确定可先输入 ${b}01${r} 做功能检查\n" "$y"
+  print_main_menu_nav_hint
 }
 
-# 将菜单编号或别名解析为工具名与参数（如 1 → system info）
-resolve_selection() {
+# 主菜单编号解析：只选工具大类，不带默认子命令（一律进子脚本二级菜单）
+resolve_menu_selection() {
   local input="${1:-}"
-  local input_lower
   input="$(normalize_user_input "$input")"
-  input_lower="$(tolower "$input")"
-  if [[ "$input_lower" =~ ^0*[0-9]+$ ]]; then
-    input_lower="$((10#${input_lower}))"
-  fi
+  local key
+  key="$(tolower "$input")"
+
   SELECTED_ACTION="tool"
   SELECTED_TOOL=""
   SELECTED_ARGS=()
 
+  case "$key" in
+    01|001|check|功能检查) SELECTED_ACTION="check"; return 0 ;;
+    02|002|status|状态|状态面板) SELECTED_ACTION="status"; return 0 ;;
+    03|003|versions|版本|组件版本) SELECTED_ACTION="versions"; return 0 ;;
+    0|q|quit|exit|退出) SELECTED_ACTION="exit"; return 0 ;;
+  esac
+
+  if [[ "$key" =~ ^0*[0-9]+$ ]]; then
+    key="$((10#${key}))"
+  fi
+
+  case "$key" in
+    1)  SELECTED_TOOL="system" ;;
+    2)  SELECTED_TOOL="host" ;;
+    3)  SELECTED_TOOL="service" ;;
+    4)  SELECTED_TOOL="du-analyze" ;;
+    5)  SELECTED_TOOL="basic" ;;
+    6)  SELECTED_TOOL="swap" ;;
+    7)  SELECTED_TOOL="logclean" ;;
+    8)  SELECTED_TOOL="ntp" ;;
+    9)  SELECTED_TOOL="network" ;;
+    10) SELECTED_TOOL="bench" ;;
+    11) SELECTED_TOOL="ssh" ;;
+    12) SELECTED_TOOL="bbr" ;;
+    13) SELECTED_TOOL="firewall" ;;
+    14) SELECTED_TOOL="ssl-check" ;;
+    15) SELECTED_TOOL="docker" ;;
+    16) SELECTED_TOOL="disk" ;;
+    17) SELECTED_TOOL="security" ;;
+    18) SELECTED_TOOL="user" ;;
+    19) SELECTED_TOOL="cron" ;;
+    20) SELECTED_TOOL="web" ;;
+    21) SELECTED_TOOL="db" ;;
+    22) SELECTED_TOOL="app-config" ;;
+    23) SELECTED_TOOL="logs" ;;
+    24) SELECTED_TOOL="audit" ;;
+    25) SELECTED_TOOL="cron-templates" ;;
+    26) SELECTED_TOOL="mirror" ;;
+    27) SELECTED_TOOL="homebrew" ;;
+    28) SELECTED_TOOL="lmirrors" ;;
+    29) SELECTED_ACTION="init"; return 0 ;;
+    30) SELECTED_ACTION="uninstall"; return 0 ;;
+    31) SELECTED_ACTION="update"; return 0 ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
+# 执行主菜单选中项并统一反馈 / 暂停
+run_menu_action() {
+  local label="" detail=""
+  TOOL_EXIT_CODE=0
+
+  case "$SELECTED_ACTION" in
+    exit)
+      log_info "已退出。"
+      exit 0
+      ;;
+    update)
+      netool_print_action_start "更新工具箱"
+      run_self_update || TOOL_EXIT_CODE=$?
+      if (( TOOL_EXIT_CODE == 2 )); then TOOL_EXIT_CODE=0; fi
+      ;;
+    check)
+      netool_print_action_start "功能检查"
+      run_capability_check || TOOL_EXIT_CODE=$?
+      ;;
+    status)
+      netool_print_action_start "状态面板"
+      run_status_panel || TOOL_EXIT_CODE=$?
+      ;;
+    versions)
+      netool_print_action_start "组件版本"
+      run_versions_display || TOOL_EXIT_CODE=$?
+      ;;
+    init)
+      netool_print_action_start "初始化向导"
+      run_init_wizard || TOOL_EXIT_CODE=$?
+      ;;
+    uninstall)
+      netool_print_action_start "卸载工具箱"
+      run_uninstall || TOOL_EXIT_CODE=$?
+      ;;
+    tool)
+      label="$(tool_display_name "$SELECTED_TOOL")"
+      detail="${SELECTED_ARGS[*]:-}"
+      netool_print_action_start "$label" "$detail"
+      if [[ "$SELECTED_TOOL" == "disk" ]]; then
+        log_info "磁盘类操作请在子菜单中选择；破坏性操作须先 --plan。"
+      fi
+      run_tool "$SELECTED_TOOL" ${SELECTED_ARGS[@]+"${SELECTED_ARGS[@]}"}
+      ;;
+  esac
+
+  if (( TOOL_EXIT_CODE != 0 )); then
+    log_warn "执行失败（退出码：${TOOL_EXIT_CODE}）。可先运行 01 做功能检查。"
+  else
+    log_success "执行完成。"
+  fi
+  netool_pause_menu
+  TOOL_EXIT_CODE=0
+}
+
+# 检测交互菜单是否可用；curl | bash 时若 /dev/tty 仍可用则警告后继续
+check_interactive_tty() {
+  [[ "${NETOOL_ALLOW_PIPE_MENU:-0}" == "1" ]] && return 0
+  if [[ -t 0 ]]; then
+    return 0
+  fi
+  if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
+    log_warn "检测到 stdin 非终端（常见于 curl | bash 管道模式）。"
+    log_info "若菜单无法输入，请改用: bash <(curl -fsSL ${SHORT_SCRIPT_URL})"
+    return 0
+  fi
+  log_error "当前 stdin 非终端，无法使用交互菜单。"
+  log_info "请改用进程替换进入菜单："
+  printf "  bash <(curl -fsSL %s)\n" "$SHORT_SCRIPT_URL"
+  log_info "或直接带参数执行，例如："
+  printf "  bash <(curl -fsSL %s) status\n" "$SHORT_SCRIPT_URL"
+  exit "$EXIT_USAGE"
+}
+
+# CLI / 别名解析：支持子命令参数；纯数字优先走主菜单大类映射
+resolve_selection() {
+  local input="${1:-}"
+  input="$(normalize_user_input "$input")"
+  local input_lower
+  input_lower="$(tolower "$input")"
+
+  SELECTED_ACTION="tool"
+  SELECTED_TOOL=""
+  SELECTED_ARGS=()
+
+  # 主菜单编号（01-25、0）与 resolve_menu_selection 一致
+  if [[ "$input_lower" =~ ^[0-9]+$ ]]; then
+    if resolve_menu_selection "$input_lower"; then
+      return 0
+    fi
+  fi
+
+  # 兼容旧版菜单编号 36-39
   case "$input_lower" in
-    1|system|sys|info|系统|系统信息|系统工具)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(info)
-      ;;
-    2|time|date|users|who|时间|用户|登录用户)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(time-users)
-      ;;
-    3|system-services|running-services|systemd|运行服务)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(services)
-      ;;
-    4|host|hostname|timezone|time-zone|主机名|时区|时间管理)
-      SELECTED_TOOL="host"
-      ;;
-    5|service|services|process|processes|top|进程|服务管理|进程管理)
-      SELECTED_TOOL="service"
-      ;;
-    6|du-analyze|du|disk-usage|analyze|磁盘占用|占用分析|大文件)
-      SELECTED_TOOL="du-analyze"
-      ;;
-    7|system-update|sys-update|update-system|升级系统|系统更新)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(update)
-      ;;
-    8|system-clean|sys-clean|clean|cleanup|系统清理|清理)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(clean)
-      ;;
-    9|basic|base|tools|install-tools|基础工具|常用工具|工具安装)
-      SELECTED_TOOL="basic"
-      ;;
-    10|swap|swapfile|虚拟内存|交换分区|swap管理)
-      SELECTED_TOOL="swap"
-      ;;
-    11|logclean|log-clean|clean-logs|日志清理|清理日志)
-      SELECTED_TOOL="logclean"
-      ;;
-    12|ntp|time-sync|timesync|时间同步|对时)
-      SELECTED_TOOL="ntp"
-      ;;
-    13|network|net|ip|ports|port-check|网络|网络工具|端口|端口管理)
-      SELECTED_TOOL="network"
-      SELECTED_ARGS=(ports)
-      ;;
-    14|dns|resolve|解析|dns解析)
-      SELECTED_TOOL="network"
-      SELECTED_ARGS=(dns)
-      ;;
-    15|ping|连通性|ping测试)
-      SELECTED_TOOL="network"
-      SELECTED_ARGS=(ping)
-      ;;
-    16|bench|benchmark|test-scripts|性能测试|测试脚本)
-      SELECTED_TOOL="bench"
-      ;;
-    17|ssh|sshd|ssh-port|ssh_port|ssh端口)
-      SELECTED_TOOL="ssh"
-      ;;
-    18|bbr|tcp-bbr|bbr管理|网络优化|加速)
-      SELECTED_TOOL="bbr"
-      ;;
-    19|firewall|fw|port|防火墙|端口放行|防火墙管理)
-      SELECTED_TOOL="firewall"
-      ;;
-    20|ssl-check|sslcheck|cert-check|cert|证书|证书检查|https证书)
-      SELECTED_TOOL="ssl-check"
-      ;;
-    21|docker|dock|dk|容器)
-      SELECTED_TOOL="docker"
-      SELECTED_ARGS=(status)
-      ;;
-    22|docker-assets|docker-resources|images|volumes|networks|镜像|数据卷|docker资源)
-      SELECTED_TOOL="docker"
-      SELECTED_ARGS=(images)
-      ;;
-    23|docker-install|docker-setup|install-docker|docker安装|安装docker)
-      SELECTED_TOOL="docker"
-      SELECTED_ARGS=(install)
-      ;;
-    24|disk|disks|fdisk|parted|分区|磁盘|挂载|磁盘管理)
-      SELECTED_TOOL="disk"
-      ;;
-    25|slot-map|slot|map|disk-slot|disk_slot|盘位|盘位映射|硬盘盘位)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(slot-map)
-      ;;
-    26|disk-test|disk_test|verify-disk|verify_disk|full-rw-test|rw-test|test|验盘|硬盘检测|硬盘好坏检测|全盘测试|读写校验)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(full-rw-test)
-      ;;
-    27|smart|smart-long|disk-smart|disk_smart|smart长测|硬盘长测)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(smart-long)
-      ;;
-    28|security|secure|fail2ban|ssh-guard|安全|ssh防护|防护)
-      SELECTED_TOOL="security"
-      ;;
-    29|user|usermgr|user-mgmt|用户|用户管理)
-      SELECTED_TOOL="user"
-      ;;
-    30|cron|crontab|定时|定时任务|计划任务)
-      SELECTED_TOOL="cron"
-      ;;
-    31|mirror|mirrors|source|sources|repo|repos|换源|软件源|镜像源)
-      SELECTED_TOOL="mirror"
-      ;;
-    32|homebrew|brew|brew-install|homebrew-install|brew安装|homebrew安装)
-      SELECTED_TOOL="homebrew"
-      ;;
-    33|lmirrors|linux-mirrors|change-mirrors|linuxmirrors|换源工具|docker换源|软件源切换|全能换源)
-      SELECTED_TOOL="lmirrors"
-      ;;
-    34|init|initialize|setup|new-server|初始化|初始化向导|服务器初始化|新服务器)
-      SELECTED_ACTION="init"
-      ;;
-    35|uninstall|remove|uninstall-toolbox|卸载|卸载工具箱|删除工具箱)
-      SELECTED_ACTION="uninstall"
-      ;;
-    36|check|checkup|doctor|env|health|功能检查|可用性检查|环境检查)
+    36) SELECTED_ACTION="check"; return 0 ;;
+    37) SELECTED_ACTION="status"; return 0 ;;
+    38) SELECTED_ACTION="versions"; return 0 ;;
+    39) SELECTED_ACTION="update"; return 0 ;;
+  esac
+
+  case "$input_lower" in
+    check|checkup|doctor|env|health|功能检查|可用性检查|环境检查)
       SELECTED_ACTION="check"
       ;;
-    37|status|overview|panel|状态|状态面板|概览)
+    status|overview|panel|状态|状态面板|概览)
       SELECTED_ACTION="status"
       ;;
-    38|versions|version-all|组件版本|版本列表)
+    versions|version-all|组件版本|版本列表)
       SELECTED_ACTION="versions"
       ;;
-    39|0update|script-update|self-update|update|脚本更新|更新)
+    update|self-update|selfupdate|script-update|0update|工具箱更新|更新工具箱|脚本更新)
       SELECTED_ACTION="update"
+      ;;
+    init|initialize|setup|new-server|初始化|初始化向导|服务器初始化|新服务器)
+      SELECTED_ACTION="init"
+      ;;
+    uninstall|remove|uninstall-toolbox|卸载|卸载工具箱|删除工具箱)
+      SELECTED_ACTION="uninstall"
       ;;
     0|q|quit|exit|退出)
       SELECTED_ACTION="exit"
+      ;;
+    system|sys|系统|系统工具)
+      SELECTED_TOOL="system"
+      ;;
+    info|系统信息)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(info)
+      ;;
+    time|date|users|who|时间|用户|登录用户|time-users|time_users)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(time-users)
+      ;;
+    system-services|running-services|systemd|运行服务|services)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(services)
+      ;;
+    system-update|sys-update|update-system|升级系统|系统更新)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(update)
+      ;;
+    system-clean|sys-clean|cleanup|系统清理)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(clean)
+      ;;
+    clean)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(clean)
+      ;;
+    host|hostname|timezone|time-zone|主机名|时区|时间管理)
+      SELECTED_TOOL="host"
+      ;;
+    service|services|process|processes|top|进程|服务管理|进程管理)
+      SELECTED_TOOL="service"
+      ;;
+    du-analyze|du|disk-usage|analyze|磁盘占用|占用分析|大文件)
+      SELECTED_TOOL="du-analyze"
+      ;;
+    basic|base|tools|install-tools|基础工具|常用工具|工具安装)
+      SELECTED_TOOL="basic"
+      ;;
+    swap|swapfile|虚拟内存|交换分区|swap管理)
+      SELECTED_TOOL="swap"
+      ;;
+    logclean|log-clean|clean-logs|日志清理|清理日志)
+      SELECTED_TOOL="logclean"
+      ;;
+    ntp|time-sync|timesync|时间同步|对时)
+      SELECTED_TOOL="ntp"
+      ;;
+    network|net|ip|网络|网络工具)
+      SELECTED_TOOL="network"
+      ;;
+    ports|port-check|端口|端口管理)
+      SELECTED_TOOL="network"
+      SELECTED_ARGS=(ports)
+      ;;
+    dns|resolve|解析|dns解析)
+      SELECTED_TOOL="network"
+      SELECTED_ARGS=(dns)
+      ;;
+    ping|连通性|ping测试)
+      SELECTED_TOOL="network"
+      SELECTED_ARGS=(ping)
+      ;;
+    bench|benchmark|test-scripts|性能测试|测试脚本)
+      SELECTED_TOOL="bench"
+      ;;
+    ssh|sshd|ssh-port|ssh_port|ssh端口)
+      SELECTED_TOOL="ssh"
+      ;;
+    bbr|tcp-bbr|bbr管理|网络优化|加速)
+      SELECTED_TOOL="bbr"
+      ;;
+    firewall|fw|防火墙|端口放行|防火墙管理)
+      SELECTED_TOOL="firewall"
+      ;;
+    ssl-check|sslcheck|cert-check|cert|证书|证书检查|https证书)
+      SELECTED_TOOL="ssl-check"
+      ;;
+    docker|dock|dk|容器)
+      SELECTED_TOOL="docker"
+      ;;
+    docker-status|容器状态)
+      SELECTED_TOOL="docker"
+      SELECTED_ARGS=(status)
+      ;;
+    docker-assets|docker-resources|images|volumes|networks|镜像|数据卷|docker资源)
+      SELECTED_TOOL="docker"
+      SELECTED_ARGS=(images)
+      ;;
+    docker-install|docker-setup|install-docker|docker安装|安装docker)
+      SELECTED_TOOL="docker"
+      SELECTED_ARGS=(install)
+      ;;
+    disk|disks|fdisk|parted|分区|磁盘|挂载|磁盘管理)
+      SELECTED_TOOL="disk"
+      ;;
+    slot-map|slot|map|disk-slot|disk_slot|盘位|盘位映射|硬盘盘位)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(slot-map)
+      ;;
+    disk-test|disk_test|verify-disk|verify_disk|full-rw-test|rw-test|test|验盘|硬盘检测|硬盘好坏检测|全盘测试|读写校验)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(full-rw-test)
+      ;;
+    smart|smart-long|disk-smart|disk_smart|smart长测|硬盘长测)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(smart-long)
+      ;;
+    security|secure|fail2ban|ssh-guard|安全|ssh防护|防护)
+      SELECTED_TOOL="security"
+      ;;
+    user|usermgr|user-mgmt|用户|用户管理)
+      SELECTED_TOOL="user"
+      ;;
+    cron|crontab|定时|定时任务|计划任务)
+      SELECTED_TOOL="cron"
+      ;;
+    web|nginx|apache|caddy|web服务器)
+      SELECTED_TOOL="web"
+      ;;
+    db|database|mysql|redis|postgres|数据库)
+      SELECTED_TOOL="db"
+      ;;
+    app-config|appconfig|应用配置)
+      SELECTED_TOOL="app-config"
+      ;;
+    audit|权限审计|安全审计)
+      SELECTED_TOOL="audit"
+      ;;
+    logs|log-monitor|日志监控)
+      SELECTED_TOOL="logs"
+      ;;
+    cron-templates|cron-template|定时模板)
+      SELECTED_TOOL="cron-templates"
+      ;;
+    mirror|mirrors|source|sources|repo|repos|换源|软件源|镜像源|轻量换源)
+      SELECTED_TOOL="mirror"
+      ;;
+    homebrew|brew|brew-install|homebrew-install|brew安装|homebrew安装)
+      SELECTED_TOOL="homebrew"
+      ;;
+    lmirrors|linux-mirrors|change-mirrors|linuxmirrors|换源工具|docker换源|软件源切换|全能换源)
+      SELECTED_TOOL="lmirrors"
       ;;
     *)
       return 1
@@ -867,6 +1057,12 @@ tool_rel_path() {
     ssl-check) printf "tools/network/ssl-check.sh" ;;
     ntp) printf "tools/system/ntp.sh" ;;
     du-analyze) printf "tools/disk/du-analyze.sh" ;;
+    web) printf "tools/apps/web.sh" ;;
+    db) printf "tools/apps/db.sh" ;;
+    app-config) printf "tools/apps/app-config.sh" ;;
+    audit) printf "tools/apps/audit.sh" ;;
+    logs) printf "tools/apps/logs.sh" ;;
+    cron-templates) printf "tools/apps/cron-templates.sh" ;;
     *) return 1 ;;
   esac
 }
@@ -890,7 +1086,18 @@ is_local_deploy() {
 fetch_remote_file() {
   local rel_path="$1"
   local dest="$2"
+  local cached=""
   mkdir -p "$(dirname "$dest")"
+
+  if [[ "${NETOOL_NO_CACHE:-0}" != "1" ]]; then
+    cached="$(netool_cache_path "$rel_path")"
+    if netool_cache_fresh "$cached" && validate_bash_script "$cached"; then
+      cp "$cached" "$dest"
+      chmod 700 "$dest"
+      return 0
+    fi
+  fi
+
   if ! curl -fsSL "${RAW_BASE_URL}/${rel_path}" -o "$dest"; then
     log_error "下载失败：${RAW_BASE_URL}/${rel_path}"
     return 1
@@ -900,6 +1107,11 @@ fetch_remote_file() {
     return 1
   fi
   chmod 700 "$dest"
+
+  if [[ "${NETOOL_NO_CACHE:-0}" != "1" && -n "$cached" ]]; then
+    mkdir -p "$(dirname "$cached")"
+    cp "$dest" "$cached" 2>/dev/null || true
+  fi
   return 0
 }
 
@@ -957,6 +1169,12 @@ tool_display_name() {
     ssl-check) printf "HTTPS 证书检查\n" ;;
     ntp) printf "时间同步管理\n" ;;
     du-analyze) printf "磁盘占用分析\n" ;;
+    web) printf "Web 服务器 (Nginx/Apache/Caddy)\n" ;;
+    db) printf "数据库 (MySQL/PG/Redis)\n" ;;
+    app-config) printf "应用配置扫描\n" ;;
+    audit) printf "权限与安全审计\n" ;;
+    logs) printf "日志与监控查看\n" ;;
+    cron-templates) printf "定时任务模板\n" ;;
     *) printf "%s\n" "$1" ;;
   esac
 }
@@ -1012,6 +1230,8 @@ run_tool() {
   if [[ -f "$local_path" ]]; then
     TOOL_EXIT_CODE=0
     export NETOOL=1
+    export QUIET="${QUIET:-0}"
+    export NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
     export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
     export NETOOL_MAIN_SH="${SCRIPT_DIR}/main.sh"
     if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
@@ -1039,6 +1259,8 @@ run_tool() {
 
   export NETOOL=1
   export NETOOL_REMOTE=1
+  export QUIET="${QUIET:-0}"
+  export NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
   export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
   export NETOOL_COMMON_FILE="${tmp_root}/tools/common.sh"
 
@@ -1111,7 +1333,7 @@ run_uninstall() {
   return 0
 }
 
-# 交互式菜单主循环：list_tools → 读入编号 → resolve_selection → 执行
+# 交互式菜单主循环
 interactive_loop() {
   local answer=""
 
@@ -1124,59 +1346,22 @@ interactive_loop() {
       exit 1
     fi
 
-    if resolve_selection "$answer"; then
-      case "$SELECTED_ACTION" in
-        exit)
-          log_info "已退出。"
-          exit 0
-          ;;
-        update)
-          run_self_update || TOOL_EXIT_CODE=$?
-          # 返回码 2 表示非 git 仓库仅展示更新说明，不算失败
-          if (( TOOL_EXIT_CODE == 2 )); then
-            TOOL_EXIT_CODE=0
-          fi
-          ;;
-        check)
-          run_capability_check || TOOL_EXIT_CODE=$?
-          ;;
-        status)
-          run_status_panel || TOOL_EXIT_CODE=$?
-          ;;
-        versions)
-          run_versions_display || TOOL_EXIT_CODE=$?
-          ;;
-        init)
-          run_init_wizard || TOOL_EXIT_CODE=$?
-          ;;
-        uninstall)
-          run_uninstall || TOOL_EXIT_CODE=$?
-          ;;
-        tool)
-          if [[ "$SELECTED_TOOL" == "disk" && "${SELECTED_ARGS[0]:-}" == "full-rw-test" ]]; then
-            log_warn "硬盘验盘会全盘写入并清空被测盘。建议先使用 --plan 预览目标。"
-          fi
-          run_tool "$SELECTED_TOOL" ${SELECTED_ARGS[@]+"${SELECTED_ARGS[@]}"}
-          ;;
-      esac
-
-      if (( TOOL_EXIT_CODE != 0 )); then
-        log_warn "工具执行失败（退出码：${TOOL_EXIT_CODE}），返回菜单。"
-      fi
-      TOOL_EXIT_CODE=0
+    if resolve_menu_selection "$answer"; then
+      run_menu_action
       print_divider
       printf "%snetool 懒人工具箱 v%s%s\n" "$COLOR_BOLD" "$SCRIPT_VERSION" "$COLOR_RESET"
       print_divider
     elif [[ -z "$answer" ]]; then
       log_warn "未读取到输入，请重新输入。"
     else
-      log_warn "无效输入：${answer}。请输入 0-39 或工具名称。"
+      log_warn "无效输入：${answer}。请输入 01-25、0 或工具名称。"
     fi
   done
 }
 
 # 入口：解析全局选项 → 许可确认 → 参数模式或 interactive_loop
 main() {
+  NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
   while (($# > 0)); do
     case "${1:-}" in
       -h|--help|help) usage; exit "$EXIT_OK" ;;
@@ -1184,11 +1369,15 @@ main() {
       --license|license) printf "%s\n" "$AGREEMENT_URL"; exit "$EXIT_OK" ;;
       --list|list) list_tools; exit "$EXIT_OK" ;;
       -q|--quiet) QUIET=1; shift ;;
+      -y|--yes) NON_INTERACTIVE=1; shift ;;
       --) shift; break ;;
       -*) die "未知选项：$1。使用 --help 查看帮助。"; exit "$EXIT_USAGE" ;;
       *) break ;;
     esac
   done
+
+  export QUIET="${QUIET:-0}"
+  export NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
   if ! command_exists mktemp; then
     log_warn "缺少 mktemp，部分功能可能受限。"
@@ -1246,6 +1435,7 @@ main() {
     fi
   fi
 
+  check_interactive_tty
   interactive_loop
 }
 

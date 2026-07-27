@@ -27,16 +27,6 @@ trap on_error ERR
 # 远程 init 链式调用子工具时使用的 main.sh 地址（由 main.sh 注入或默认 Gitee raw）
 NETOOL_ENTRY_URL="${NETOOL_ENTRY_URL:-${NETOOL_RAW_BASE}/main.sh}"
 
-# confirm_default_no — 交互确认，默认否
-confirm_default_no() {
-  local reply=""
-  if ! read_prompt "(y/n) [默认: n]: " reply; then reply="n"; fi
-  reply="${reply:-n}"
-  case "$(tolower "$reply")" in
-    y|yes|是|确认) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 usage() {
   cat <<EOF
