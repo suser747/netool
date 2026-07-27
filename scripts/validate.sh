@@ -7,6 +7,14 @@ cd "$ROOT"
 
 fail=0
 
+echo "==> 换行符检查 (shell 脚本必须为 LF)"
+while IFS= read -r -d '' f; do
+  if grep -q $'\r' "$f"; then
+    echo "FAIL (CRLF): $f"
+    fail=1
+  fi
+done < <(find . -name '*.sh' -not -path './.git/*' -print0)
+
 echo "==> bash -n 语法检查"
 while IFS= read -r -d '' f; do
   if ! bash -n "$f"; then

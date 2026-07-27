@@ -15,6 +15,20 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
+      - name: Check shell script line endings (must be LF)
+        run: |
+          bad=0
+          while IFS= read -r -d '' f; do
+            if grep -q $'\r' "$f"; then
+              echo "CRLF detected: $f"
+              bad=1
+            fi
+          done < <(find . -name '*.sh' -not -path './.git/*' -print0)
+          if (( bad != 0 )); then
+            echo "Shell scripts must use LF line endings. Run: python scripts/dev/fix_line_endings.py --fix"
+            exit 1
+          fi
+
       - name: Run shellcheck
         run: |
           find . -name '*.sh' -not -path './.git/*' -print0 | \

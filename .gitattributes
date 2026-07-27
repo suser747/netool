@@ -1,0 +1,11 @@
+# Ensure Linux-runnable scripts always use LF (avoid "command not found" / invalid option on CRLF)
+* text=auto
+
+*.sh     text eol=lf
+*.bash   text eol=lf
+*.py     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.env    text eol=lf
+
+.editorconfig text eol=lf
