@@ -626,11 +626,21 @@ list_tools() {
   local y="${COLOR_YELLOW}"
 
   _menu_row() {
-    if [[ -n "${3:-}" ]]; then
-      printf "  ${b}[%2s]${r} %-10s    ${b}[%2s]${r} %s\n" "$1" "$2" "$3" "$4"
-    else
-      printf "  ${b}[%2s]${r} %s\n" "$1" "$2"
-    fi
+    # 每行最多 4 个选项；不足 4 个时右侧留空
+    # 参数成对传入: num1 label1 num2 label2 num3 label3 num4 label4
+    local out=""
+    local piece
+    local i
+    for ((i = 1; i <= 7; i += 2)); do
+      if [[ -n "${!i:-}" ]]; then
+        local n="${!i}"
+        local lbl_idx=$((i + 1))
+        local lbl="${!lbl_idx:-}"
+        printf -v piece "  ${b}[%2s]${r} %-10s" "$n" "$lbl"
+        out+="$piece"
+      fi
+    done
+    printf "%s\n" "$out"
   }
 
   _menu_section() {
@@ -638,188 +648,183 @@ list_tools() {
   }
 
   _menu_section "系统查看"
-  _menu_row "1"  "系统信息"   "11" "时间/用户"
-  _menu_row "12" "运行服务"   "23" "主机/时区"
-  _menu_row "25" "进程/服务"  "35" "磁盘占用"
+  _menu_row "1"  "系统信息"   "2"  "时间/用户"  "3"  "运行服务"  "4"  "主机/时区"
+  _menu_row "5"  "进程/服务"   "6"  "磁盘占用"   ""  ""          ""  ""
 
   _menu_section "系统维护"
-  _menu_row "2"  "系统更新*"  "3"  "系统清理*"
-  _menu_row "17" "基础工具"   "20" "Swap 管理"
-  _menu_row "30" "日志清理"   "33" "时间同步"
+  _menu_row "7"  "系统更新*"  "8"  "系统清理*"  "9"  "基础工具"   "10" "Swap 管理"
+  _menu_row "11" "日志清理"   "12" "时间同步"   ""  ""          ""  ""
 
   _menu_section "网络"
-  _menu_row "6"  "网络端口"   "13" "DNS 测试"
-  _menu_row "14" "Ping 测试"  "19" "性能测试"
-  _menu_row "4"  "SSH 管理"   "18" "BBR 优化"
-  _menu_row "21" "防火墙"     "34" "证书检查"
+  _menu_row "13" "网络端口"   "14" "DNS 测试"  "15" "Ping 测试"  "16" "性能测试"
+  _menu_row "17" "SSH 管理"   "18" "BBR 优化"  "19" "防火墙"     "20" "证书检查"
 
   _menu_section "Docker"
-  _menu_row "5"  "容器状态"   "16" "镜像/卷/网络"
-  _menu_row "22" "安装 Docker"
+  _menu_row "21" "容器状态"   "22" "镜像/卷"   "23" "安装 Docker" ""  ""
 
   _menu_section "磁盘硬件"
-  _menu_row "7"  "磁盘管理"   "9"  "盘位映射"
-  _menu_row "8"  "验盘检测!"  "10" "SMART 长测"
+  _menu_row "24" "磁盘管理"   "25" "盘位映射"  "26" "验盘检测!"  "27" "SMART 长测"
 
   _menu_section "用户安全"
-  _menu_row "24" "Fail2ban"   "31" "用户管理"
-  _menu_row "32" "定时任务"
+  _menu_row "28" "Fail2ban"   "29" "用户管理"  "30" "定时任务"   ""  ""
 
   _menu_section "软件源"
-  _menu_row "15" "轻量换源"   "26" "Homebrew"
-  _menu_row "27" "全能换源"
+  _menu_row "31" "轻量换源"   "32" "Homebrew" "33" "全能换源"   ""  ""
 
   _menu_section "快捷工具"
-  _menu_row "28" "初始化向导" "29" "卸载工具箱"
+  _menu_row "34" "初始化"     "35" "卸载工具箱" ""  ""          ""  ""
 
   _menu_section "其他"
-  printf "  ${y}[%2s]${r} 功能检查       ${y}[%2s]${r} 状态面板\n" "01" "02"
-  printf "  ${y}[%2s]${r} 组件版本       ${y}[%2s]${r} 更新脚本\n" "03" "00"
-  printf "  ${y}[%2s]${r} 退出\n" "0"
+  _menu_row "36" "功能检查"   "37" "状态面板"  "38" "组件版本"   "39" "更新脚本"
+  _menu_row "0"  "退出"       ""  ""          ""  ""           ""  ""
 
   printf "\n"
-  printf "%s说明:${r} *仅提示命令  !毁数据  不确定请先输入 ${b}01${r}\n" "$y"
+  printf "%s说明:${r} *仅提示命令  !毁数据  不确定请先输入 ${b}36${r}\n" "$y"
 }
 
-# 将菜单编号或别名解析为工具名与参数（如 15 → mirror）
+# 将菜单编号或别名解析为工具名与参数（如 1 → system info）
 resolve_selection() {
   local input="${1:-}"
   local input_lower
+  input="$(normalize_user_input "$input")"
   input_lower="$(tolower "$input")"
+  if [[ "$input_lower" =~ ^0*[0-9]+$ ]]; then
+    input_lower="$((10#${input_lower}))"
+  fi
   SELECTED_ACTION="tool"
   SELECTED_TOOL=""
   SELECTED_ARGS=()
 
   case "$input_lower" in
-    1|system|sys|status|info|系统|系统信息|系统工具)
+    1|system|sys|info|系统|系统信息|系统工具)
       SELECTED_TOOL="system"
       SELECTED_ARGS=(info)
       ;;
-    2|system-update|sys-update|update-system|升级系统|系统更新)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(update)
-      ;;
-    3|system-clean|sys-clean|clean|cleanup|系统清理|清理)
-      SELECTED_TOOL="system"
-      SELECTED_ARGS=(clean)
-      ;;
-    4|ssh|sshd|ssh-port|ssh_port|ssh端口)
-      SELECTED_TOOL="ssh"
-      ;;
-    5|docker|dock|dk|容器)
-      SELECTED_TOOL="docker"
-      SELECTED_ARGS=(status)
-      ;;
-    6|network|net|ip|ports|port-check|网络|网络工具|端口|端口管理)
-      SELECTED_TOOL="network"
-      SELECTED_ARGS=(ports)
-      ;;
-    7|disk|disks|fdisk|parted|分区|磁盘|挂载|磁盘管理)
-      SELECTED_TOOL="disk"
-      ;;
-    8|disk-test|disk_test|verify-disk|verify_disk|full-rw-test|rw-test|test|验盘|硬盘检测|硬盘好坏检测|全盘测试|读写校验)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(full-rw-test)
-      ;;
-    9|slot-map|slot|map|disk-slot|disk_slot|盘位|盘位映射|硬盘盘位)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(slot-map)
-      ;;
-    10|smart|smart-long|disk-smart|disk_smart|smart长测|硬盘长测)
-      SELECTED_TOOL="disk"
-      SELECTED_ARGS=(smart-long)
-      ;;
-    11|time|date|users|who|时间|用户|登录用户)
+    2|time|date|users|who|时间|用户|登录用户)
       SELECTED_TOOL="system"
       SELECTED_ARGS=(time-users)
       ;;
-    12|system-services|running-services|systemd|运行服务)
+    3|system-services|running-services|systemd|运行服务)
       SELECTED_TOOL="system"
       SELECTED_ARGS=(services)
       ;;
-    13|dns|resolve|解析|dns解析)
+    4|host|hostname|timezone|time-zone|主机名|时区|时间管理)
+      SELECTED_TOOL="host"
+      ;;
+    5|service|services|process|processes|top|进程|服务管理|进程管理)
+      SELECTED_TOOL="service"
+      ;;
+    6|du-analyze|du|disk-usage|analyze|磁盘占用|占用分析|大文件)
+      SELECTED_TOOL="du-analyze"
+      ;;
+    7|system-update|sys-update|update-system|升级系统|系统更新)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(update)
+      ;;
+    8|system-clean|sys-clean|clean|cleanup|系统清理|清理)
+      SELECTED_TOOL="system"
+      SELECTED_ARGS=(clean)
+      ;;
+    9|basic|base|tools|install-tools|基础工具|常用工具|工具安装)
+      SELECTED_TOOL="basic"
+      ;;
+    10|swap|swapfile|虚拟内存|交换分区|swap管理)
+      SELECTED_TOOL="swap"
+      ;;
+    11|logclean|log-clean|clean-logs|日志清理|清理日志)
+      SELECTED_TOOL="logclean"
+      ;;
+    12|ntp|time-sync|timesync|时间同步|对时)
+      SELECTED_TOOL="ntp"
+      ;;
+    13|network|net|ip|ports|port-check|网络|网络工具|端口|端口管理)
+      SELECTED_TOOL="network"
+      SELECTED_ARGS=(ports)
+      ;;
+    14|dns|resolve|解析|dns解析)
       SELECTED_TOOL="network"
       SELECTED_ARGS=(dns)
       ;;
-    14|ping|连通性|ping测试)
+    15|ping|连通性|ping测试)
       SELECTED_TOOL="network"
       SELECTED_ARGS=(ping)
       ;;
-    15|mirror|mirrors|source|sources|repo|repos|换源|软件源|镜像源)
-      SELECTED_TOOL="mirror"
+    16|bench|benchmark|test-scripts|性能测试|测试脚本)
+      SELECTED_TOOL="bench"
       ;;
-    16|docker-assets|docker-resources|images|volumes|networks|镜像|数据卷|docker资源)
-      SELECTED_TOOL="docker"
-      SELECTED_ARGS=(images)
-      ;;
-    17|basic|base|tools|install-tools|基础工具|常用工具|工具安装)
-      SELECTED_TOOL="basic"
+    17|ssh|sshd|ssh-port|ssh_port|ssh端口)
+      SELECTED_TOOL="ssh"
       ;;
     18|bbr|tcp-bbr|bbr管理|网络优化|加速)
       SELECTED_TOOL="bbr"
       ;;
-    19|bench|benchmark|test-scripts|性能测试|测试脚本)
-      SELECTED_TOOL="bench"
-      ;;
-    20|swap|swapfile|虚拟内存|交换分区|swap管理)
-      SELECTED_TOOL="swap"
-      ;;
-    21|firewall|fw|port|防火墙|端口放行|防火墙管理)
+    19|firewall|fw|port|防火墙|端口放行|防火墙管理)
       SELECTED_TOOL="firewall"
       ;;
-    22|docker-install|docker-setup|install-docker|docker安装|安装docker)
+    20|ssl-check|sslcheck|cert-check|cert|证书|证书检查|https证书)
+      SELECTED_TOOL="ssl-check"
+      ;;
+    21|docker|dock|dk|容器)
+      SELECTED_TOOL="docker"
+      SELECTED_ARGS=(status)
+      ;;
+    22|docker-assets|docker-resources|images|volumes|networks|镜像|数据卷|docker资源)
+      SELECTED_TOOL="docker"
+      SELECTED_ARGS=(images)
+      ;;
+    23|docker-install|docker-setup|install-docker|docker安装|安装docker)
       SELECTED_TOOL="docker"
       SELECTED_ARGS=(install)
       ;;
-    23|host|hostname|timezone|time-zone|主机名|时区|时间管理)
-      SELECTED_TOOL="host"
+    24|disk|disks|fdisk|parted|分区|磁盘|挂载|磁盘管理)
+      SELECTED_TOOL="disk"
       ;;
-    24|security|secure|fail2ban|ssh-guard|安全|ssh防护|防护)
+    25|slot-map|slot|map|disk-slot|disk_slot|盘位|盘位映射|硬盘盘位)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(slot-map)
+      ;;
+    26|disk-test|disk_test|verify-disk|verify_disk|full-rw-test|rw-test|test|验盘|硬盘检测|硬盘好坏检测|全盘测试|读写校验)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(full-rw-test)
+      ;;
+    27|smart|smart-long|disk-smart|disk_smart|smart长测|硬盘长测)
+      SELECTED_TOOL="disk"
+      SELECTED_ARGS=(smart-long)
+      ;;
+    28|security|secure|fail2ban|ssh-guard|安全|ssh防护|防护)
       SELECTED_TOOL="security"
       ;;
-    25|service|services|process|processes|top|进程|服务管理|进程管理)
-      SELECTED_TOOL="service"
-      ;;
-    26|homebrew|brew|brew-install|homebrew-install|brew安装|homebrew安装)
-      SELECTED_TOOL="homebrew"
-      ;;
-    27|lmirrors|linux-mirrors|change-mirrors|linuxmirrors|换源工具|docker换源|软件源切换|全能换源)
-      SELECTED_TOOL="lmirrors"
-      ;;
-    28|init|initialize|setup|new-server|初始化|初始化向导|服务器初始化|新服务器)
-      SELECTED_ACTION="init"
-      ;;
-    29|uninstall|remove|uninstall-toolbox|卸载|卸载工具箱|删除工具箱)
-      SELECTED_ACTION="uninstall"
-      ;;
-    30|logclean|log-clean|clean-logs|日志清理|清理日志)
-      SELECTED_TOOL="logclean"
-      ;;
-    31|user|usermgr|user-mgmt|用户|用户管理)
+    29|user|usermgr|user-mgmt|用户|用户管理)
       SELECTED_TOOL="user"
       ;;
-    32|cron|crontab|定时|定时任务|计划任务)
+    30|cron|crontab|定时|定时任务|计划任务)
       SELECTED_TOOL="cron"
       ;;
-    33|ntp|time-sync|timesync|时间同步|对时)
-      SELECTED_TOOL="ntp"
+    31|mirror|mirrors|source|sources|repo|repos|换源|软件源|镜像源)
+      SELECTED_TOOL="mirror"
       ;;
-    34|ssl-check|sslcheck|cert-check|cert|证书|证书检查|https证书)
-      SELECTED_TOOL="ssl-check"
+    32|homebrew|brew|brew-install|homebrew-install|brew安装|homebrew安装)
+      SELECTED_TOOL="homebrew"
       ;;
-    35|du-analyze|du|disk-usage|analyze|磁盘占用|占用分析|大文件)
-      SELECTED_TOOL="du-analyze"
+    33|lmirrors|linux-mirrors|change-mirrors|linuxmirrors|换源工具|docker换源|软件源切换|全能换源)
+      SELECTED_TOOL="lmirrors"
       ;;
-    01|check|checkup|doctor|env|health|功能检查|可用性检查|环境检查)
+    34|init|initialize|setup|new-server|初始化|初始化向导|服务器初始化|新服务器)
+      SELECTED_ACTION="init"
+      ;;
+    35|uninstall|remove|uninstall-toolbox|卸载|卸载工具箱|删除工具箱)
+      SELECTED_ACTION="uninstall"
+      ;;
+    36|check|checkup|doctor|env|health|功能检查|可用性检查|环境检查)
       SELECTED_ACTION="check"
       ;;
-    02|status|overview|panel|状态|状态面板|概览)
+    37|status|overview|panel|状态|状态面板|概览)
       SELECTED_ACTION="status"
       ;;
-    03|versions|version-all|组件版本|版本列表)
+    38|versions|version-all|组件版本|版本列表)
       SELECTED_ACTION="versions"
       ;;
-    00|0update|script-update|self-update|update|脚本更新|更新)
+    39|0update|script-update|self-update|update|脚本更新|更新)
       SELECTED_ACTION="update"
       ;;
     0|q|quit|exit|退出)
@@ -1009,7 +1014,7 @@ run_tool() {
     export NETOOL=1
     export NETOOL_ENTRY_URL="${SHORT_SCRIPT_URL}"
     export NETOOL_MAIN_SH="${SCRIPT_DIR}/main.sh"
-    if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
+    if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
       bash "$local_path" "$@" </dev/tty || TOOL_EXIT_CODE=$?
     else
       bash "$local_path" "$@" || TOOL_EXIT_CODE=$?
@@ -1038,7 +1043,7 @@ run_tool() {
   export NETOOL_COMMON_FILE="${tmp_root}/tools/common.sh"
 
   TOOL_EXIT_CODE=0
-  if [[ -t 1 && -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
+  if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then
     bash "$target" "$@" </dev/tty || TOOL_EXIT_CODE=$?
   else
     bash "$target" "$@" || TOOL_EXIT_CODE=$?
@@ -1165,7 +1170,7 @@ interactive_loop() {
     elif [[ -z "$answer" ]]; then
       log_warn "未读取到输入，请重新输入。"
     else
-      log_warn "无效输入：${answer}。请输入 0-35、00、01 或工具名称。"
+      log_warn "无效输入：${answer}。请输入 0-39 或工具名称。"
     fi
   done
 }

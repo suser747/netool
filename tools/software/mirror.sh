@@ -961,7 +961,7 @@ select_mirror_interactively() {
       print_mirror_choice 8 163
       print_mirror_choice 9 sjtug
       printf "  b. Back\n"
-      read -r -p "Enter a number or mirror name, default 4: " answer
+      read_prompt "Enter a number or mirror name, default 4: " answer || return 1
     else
       printf "\n请选择目标镜像站：\n"
       print_mirror_choice 1 tuna
@@ -974,7 +974,7 @@ select_mirror_interactively() {
       print_mirror_choice 8 163
       print_mirror_choice 9 sjtug
       printf "  b. 返回\n"
-      read -r -p "请输入编号或镜像站名称，默认 4： " answer
+      read_prompt "请输入编号或镜像站名称，默认 4： " answer || return 1
     fi
 
     answer="${answer#"${answer%%[![:space:]]*}"}"
@@ -1273,7 +1273,7 @@ confirm() {
     return 0
   fi
 
-  read -r -p "${prompt} $(text label_yes_no)" answer
+  read_prompt "${prompt} $(text label_yes_no)" answer || return 1
   [[ "$answer" =~ ^([yY]|[yY][eE][sS]|是|确认)$ ]]
 }
 
@@ -2302,7 +2302,14 @@ interactive_menu() {
     printf "  3. 查看备份列表\n"
     printf "  4. 查看支持的镜像站\n"
     printf "  b. 返回\n"
-    read -r -p "输入编号： " answer
+    if ! read_prompt "输入编号： " answer; then
+      if is_lang_en; then
+        log_error "Unable to read input."
+      else
+        log_error "无法读取输入。"
+      fi
+      return 1
+    fi
 
     case "$answer" in
       1)

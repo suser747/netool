@@ -356,9 +356,10 @@ confirm_action() {
   fi
 
   # 交互模式: 询问用户
-  echo -n "${tty_yellow}${prompt} (Y/N) [默认: ${default}]: ${tty_reset}"
   local input
-  read input
+  if ! read_prompt "${tty_yellow}${prompt} (Y/N) [默认: ${default}]: ${tty_reset}" input; then
+    return 1
+  fi
   input="${input:-${default}}"
 
   if [[ "${input}" =~ ^[Yy]$ ]]; then
@@ -619,14 +620,16 @@ select_mirror() {
     echo "${tty_blue}${num}${tty_reset}、${name}"
   done
 
-  echo -n "${tty_cyan}请输入序号 [默认: ${default}]: ${tty_reset}"
   local input
   # 非交互(-y)/预览(--plan)模式: 直接使用默认值，不阻塞 read
   if [[ "${YES:-0}" == "1" || "${DRY_RUN:-0}" == "1" ]]; then
     input="${default}"
     echo "${default}"
   else
-    read input
+    if ! read_prompt "${tty_cyan}请输入序号 [默认: ${default}]: ${tty_reset}" input; then
+      log_error "无法读取输入。"
+      return 1
+    fi
     input="${input:-${default}}"
   fi
 
@@ -663,14 +666,16 @@ select_simple_mirror() {
     echo "${tty_blue}${num}${tty_reset}、${name}"
   done
 
-  echo -n "${tty_cyan}请输入序号 [默认: ${default}]: ${tty_reset}"
   local input
   # 非交互(-y)/预览(--plan)模式: 直接使用默认值，不阻塞 read
   if [[ "${YES:-0}" == "1" || "${DRY_RUN:-0}" == "1" ]]; then
     input="${default}"
     echo "${default}"
   else
-    read input
+    if ! read_prompt "${tty_cyan}请输入序号 [默认: ${default}]: ${tty_reset}" input; then
+      log_error "无法读取输入。"
+      return 1
+    fi
     input="${input:-${default}}"
   fi
 
@@ -972,13 +977,15 @@ install_homebrew() {
   echo "${tty_blue}3${tty_reset}、仅更换 brew 仓库地址"
   echo "${tty_blue}0${tty_reset}、返回主菜单"
 
-  echo -n "${tty_cyan}请输入序号 [默认: 1]: ${tty_reset}"
   # 非交互(-y)/预览(--plan)模式: 直接使用默认值 1，不阻塞 read
   if [[ "${YES:-0}" == "1" || "${DRY_RUN:-0}" == "1" ]]; then
     ACTION_CHOICE="1"
     echo "1"
   else
-    read ACTION_CHOICE
+    if ! read_prompt "${tty_cyan}请输入序号 [默认: 1]: ${tty_reset}" ACTION_CHOICE; then
+      log_error "无法读取输入。"
+      return 1
+    fi
     ACTION_CHOICE="${ACTION_CHOICE:-1}"
   fi
 
@@ -1140,9 +1147,11 @@ uninstall_homebrew() {
     log_info "[预览模式] 确认要卸载吗？ -> 跳过卸载操作"
     return 0
   else
-    echo -n "${tty_yellow}确认要卸载吗？(yes/no) [默认: no]: ${tty_reset}"
     local confirm
-    read confirm
+    if ! read_prompt "${tty_yellow}确认要卸载吗？(yes/no) [默认: no]: ${tty_reset}" confirm; then
+      log_info "已取消卸载操作"
+      return 0
+    fi
     confirm="${confirm:-no}"
 
     if [[ "${confirm}" != "yes" ]]; then
@@ -1361,8 +1370,6 @@ main_menu() {
   echo "${tty_blue}3${tty_reset}、安装 Command Line Tools (Git)"
   echo "${tty_blue}0${tty_reset}、退出"
   echo ""
-  echo -n "${tty_cyan}请选择操作 [默认: 1]: ${tty_reset}"
-
   local choice
   # -y/--yes 完全非交互模式: 直接使用默认值 1（安装），不阻塞 read
   # --plan/--dry-run 模式: 仍由用户选择要预览的操作
@@ -1370,7 +1377,10 @@ main_menu() {
     choice="1"
     echo "1"
   else
-    read choice
+    if ! read_prompt "${tty_cyan}请选择操作 [默认: 1]: ${tty_reset}" choice; then
+      log_error "无法读取输入。"
+      exit 1
+    fi
     choice="${choice:-1}"
   fi
 

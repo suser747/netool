@@ -158,18 +158,27 @@ on_error() {
   exit "$exit_code"
 }
 
-# read_prompt PROMPT VAR — 读用户输入；管道场景下自动转 /dev/tty
+# normalize_user_input STR — 去除 CR 与首尾空白，避免 Windows 终端或管道输入导致菜单编号不匹配
+normalize_user_input() {
+  local val="$1"
+  val="${val//$'\r'/}"
+  val="${val#"${val%%[![:space:]]*}"}"
+  val="${val%"${val##*[![:space:]]}"}"
+  printf '%s' "$val"
+}
+
+# read_prompt PROMPT VAR — 读用户输入；stdin 非 TTY 时自动转 /dev/tty
 read_prompt() {
   local prompt="$1" var_name="$2" value=""
-  if [[ ! -t 0 && -t 1 && -r /dev/tty ]]; then
+  if [[ ! -t 0 && -r /dev/tty ]]; then
     if { printf "%s" "$prompt" >/dev/tty && IFS= read -r value </dev/tty; } 2>/dev/null; then
-      printf -v "$var_name" "%s" "$value"
+      printf -v "$var_name" "%s" "$(normalize_user_input "$value")"
       return 0
     fi
   fi
   printf "%s" "$prompt"
   IFS= read -r value || [[ -n "$value" ]] || return 1
-  printf -v "$var_name" "%s" "$value"
+  printf -v "$var_name" "%s" "$(normalize_user_input "$value")"
 }
 
 print_divider() { printf "%s%s%s\n" "$COLOR_CYAN" "------------------------------------------------------------" "$COLOR_RESET"; }
@@ -224,7 +233,7 @@ confirm_default_no() {
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
     return 1
   fi
-  read -r -p "${prompt} (y/N) " resp
+  read_prompt "${prompt} (y/N) " resp || return 1
   [[ "$resp" =~ ^[Yy]$ ]]
 }
 
@@ -233,7 +242,7 @@ confirm_default_yes() {
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
     return 0
   fi
-  read -r -p "${prompt} (Y/n) " resp
+  read_prompt "${prompt} (Y/n) " resp || return 1
   [[ ! "$resp" =~ ^[Nn]$ ]]
 }
 
@@ -242,7 +251,7 @@ confirm_phrase() {
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
     return 0
   fi
-  read -r -p "${prompt} (请输入: ${phrase}) " input
+  read_prompt "${prompt} (请输入: ${phrase}) " input || return 1
   [[ "$input" == "$phrase" ]] || die "确认短语不匹配，已取消"
 }
 

@@ -245,7 +245,7 @@ confirm_default_yes() {
     return 0
   fi
 
-  read -r -p "${prompt} [Y/n]: " answer
+  read_prompt "${prompt} [Y/n]: " answer || return 1
   [[ ! "$answer" =~ ^([nN]|[nN][oO]|否)$ ]]
 }
 
@@ -603,7 +603,7 @@ prompt_new_port() {
   fi
 
   while true; do
-    read -r -p "请输入你想使用的新 SSH 端口(输入 b 返回,q 退出): " input
+    read_prompt "请输入你想使用的新 SSH 端口(输入 b 返回,q 退出): " input || return 1
 
     case "$input" in
       b|B|back|返回)
@@ -677,7 +677,7 @@ prompt_mode() {
 EOF
 
   while true; do
-    read -r -p "请输入 1 或 2,默认 1: " choice
+    read_prompt "请输入 1 或 2,默认 1: " choice || return 1
 
     case "${choice:-1}" in
       1)
@@ -1617,7 +1617,10 @@ interactive_menu() {
     printf "  3. 查看备份列表\n"
     printf "  4. 查看当前状态\n"
     printf "  b. 返回\n"
-    read -r -p "输入编号: " answer
+    if ! read_prompt "输入编号: " answer; then
+      log_error "无法读取输入。"
+      return 1
+    fi
 
     case "$answer" in
       1)

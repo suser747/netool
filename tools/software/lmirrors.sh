@@ -1174,7 +1174,7 @@ function choose_display_language() {
         done
         local CHOICE="$(echo -e "\n${BOLD}└─ Please select and enter the display language [ 1-${#MESSAGE_LANG_KEYS[@]} ]：${PLAIN}")"
         while true; do
-            read -rp "${CHOICE}" INPUT
+            read_prompt "${CHOICE}" INPUT || continue
             case "${INPUT}" in
             [1-9] | [1-9][0-9])
                 local tmp_result="${MESSAGE_LANG_KEYS[$((INPUT - 1))]}"
@@ -1280,7 +1280,7 @@ function choose_mirrors() {
                 fi
             else
                 local CHOICE="$(echo -e "\n${BOLD}└─ $(msg "interaction.source.type.usePublicAddress")? [Y/n] ${PLAIN}")"
-                read -rp "${CHOICE}" INPUT
+                read_prompt "${CHOICE}" INPUT || continue
                 [[ -z "${INPUT}" ]] && INPUT=Y
                 case "${INPUT}" in
                 [Yy] | [Yy][Ee][Ss]) ;;
@@ -1341,7 +1341,7 @@ function choose_mirrors() {
             print_mirrors_list "${mirror_list_name}" "${mirror_list_print_length}" "mirror_list_labels"
             local CHOICE="$(echo -e "\n${BOLD}└─ $(msg "interaction.source.selectAndInput") [ 1-$(eval echo \${#${mirror_list_name}[@]}) ]：${PLAIN}")"
             while true; do
-                read -rp "${CHOICE}" INPUT
+                read_prompt "${CHOICE}" INPUT || continue
                 case "${INPUT}" in
                 [1-9] | [1-9][0-9] | [1-9][0-9][0-9])
                     local tmp_result="$(eval echo \${${mirror_list_name}[$((INPUT - 1))]})"
@@ -1393,7 +1393,7 @@ function choose_protocol() {
                 fi
             else
                 local CHOICE="$(echo -e "\n${BOLD}└─ $(msg "interaction.protocol.useHttp")? [Y/n] ${PLAIN}")"
-                read -rp "${CHOICE}" INPUT
+                read_prompt "${CHOICE}" INPUT || continue
                 [[ -z "${INPUT}" ]] && INPUT=Y
                 case "${INPUT}" in
                 [Yy] | [Yy][Ee][Ss])
@@ -1459,7 +1459,7 @@ function choose_install_epel_packages() {
             fi
         else
             local CHOICE="$(echo -e "\n${BOLD}└─ ${ask_text}? [Y/n] ${PLAIN}")"
-            read -rp "${CHOICE}" INPUT
+            read_prompt "${CHOICE}" INPUT || continue
             [[ -z "${INPUT}" ]] && INPUT=Y
             case "${INPUT}" in
             [Yy] | [Yy][Ee][Ss])
@@ -1509,7 +1509,7 @@ function backup_original_mirrors() {
                 fi
             else
                 local CHOICE_BACKUP="$(echo -e "\n${BOLD}└─ ${ask_text} [Y/n] ${PLAIN}")"
-                read -rp "${CHOICE_BACKUP}" INPUT
+                read_prompt "${CHOICE_BACKUP}" INPUT || continue
                 [[ -z "${INPUT}" ]] && INPUT=Y
                 case "${INPUT}" in
                 [Yy] | [Yy][Ee][Ss]) ;;
@@ -1557,7 +1557,7 @@ function backup_original_mirrors() {
                 fi
             else
                 local CHOICE_BACKUP="$(echo -e "\n${BOLD}└─ ${ask_text} [Y/n] ${PLAIN}")"
-                read -rp "${CHOICE_BACKUP}" INPUT
+                read_prompt "${CHOICE_BACKUP}" INPUT || continue
                 [[ -z "${INPUT}" ]] && INPUT=Y
                 case "${INPUT}" in
                 [Yy] | [Yy][Ee][Ss]) ;;
@@ -2098,7 +2098,7 @@ function upgrade_software() {
             fi
         else
             local CHOICE="$(echo -e "\n${BOLD}└─ ${ask_text} [Y/n] ${PLAIN}")"
-            read -rp "${CHOICE}" INPUT
+            read_prompt "${CHOICE}" INPUT || continue
             [[ -z "${INPUT}" ]] && INPUT=Y
             case "${INPUT}" in
             [Yy] | [Yy][Ee][Ss]) ;;
@@ -2125,7 +2125,7 @@ function upgrade_software() {
             fi
         else
             local CHOICE="$(echo -e "\n${BOLD}└─ ${ask_text} [Y/n] ${PLAIN}")"
-            read -rp "${CHOICE}" INPUT
+            read_prompt "${CHOICE}" INPUT || continue
             [[ -z "${INPUT}" ]] && INPUT=Y
             case "${INPUT}" in
             [Yy] | [Yy][Ee][Ss])
@@ -3544,10 +3544,19 @@ function interactive_select_list() {
         done
     }
     function read_key() {
-        IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then
-            IFS= read -rsn2 key
-            key="$key"
+        local key=""
+        if [[ ! -t 0 && -r /dev/tty ]]; then
+            IFS= read -rsn1 key </dev/tty 2>/dev/null || return 1
+            if [[ $key == $'\x1b' ]]; then
+                IFS= read -rsn2 key </dev/tty 2>/dev/null || true
+                key="$key"
+            fi
+        else
+            IFS= read -rsn1 key
+            if [[ $key == $'\x1b' ]]; then
+                IFS= read -rsn2 key
+                key="$key"
+            fi
         fi
         echo "$key"
     }
@@ -3628,10 +3637,19 @@ function interactive_select_boolean() {
         fi
     }
     function read_key() {
-        IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then
-            IFS= read -rsn2 key
-            key="$key"
+        local key=""
+        if [[ ! -t 0 && -r /dev/tty ]]; then
+            IFS= read -rsn1 key </dev/tty 2>/dev/null || return 1
+            if [[ $key == $'\x1b' ]]; then
+                IFS= read -rsn2 key </dev/tty 2>/dev/null || true
+                key="$key"
+            fi
+        else
+            IFS= read -rsn1 key
+            if [[ $key == $'\x1b' ]]; then
+                IFS= read -rsn2 key
+                key="$key"
+            fi
         fi
         echo "$key"
     }
