@@ -22,17 +22,13 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status
 
 > 将截图放入 `docs/images/` 后，取消下方注释即可在文档中显示。
 
-<!-- 交互菜单 -->
-<!-- ![交互式菜单](docs/images/menu.png) -->
-*（预留：menu.png — 运行 `./main.sh` 或远程入口命令的菜单界面）*
+交互菜单
+![交互式菜单](docs/images/menu.png)
 
-<!-- 状态面板 -->
-<!-- ![状态面板](docs/images/status.png) -->
-*（预留：status.png — `./main.sh status` 输出示例）*
 
-<!-- curl 远程 -->
-<!-- ![curl 远程运行](docs/images/curl-demo.png) -->
-*（预留：curl-demo.png — 远程一键检查/换源等终端截图）*
+状态面板
+![状态面板](docs/images/status.png)
+
 
 ---
 
