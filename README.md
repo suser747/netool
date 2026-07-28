@@ -8,13 +8,13 @@
 
 ```bash
 # 方式 A：进入交互菜单（最常用）
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i)
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)
 
 # 方式 B：直接执行某个工具（如检查系统状态）
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) status
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status
 ```
 
-> 完整命令格式：`bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) <工具名> [参数]`
+> 完整命令格式：`bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) <工具名> [参数]`
 
 ---
 
@@ -24,7 +24,7 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) status
 
 <!-- 交互菜单 -->
 <!-- ![交互式菜单](docs/images/menu.png) -->
-*（预留：menu.png — 运行 `./main.sh` 或 `bash <(curl -fsSL .../m/i)` 的菜单界面）*
+*（预留：menu.png — 运行 `./main.sh` 或远程入口命令的菜单界面）*
 
 <!-- 状态面板 -->
 <!-- ![状态面板](docs/images/status.png) -->
@@ -58,10 +58,10 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) status
 
 ```bash
 # ✅ 推荐：进程替换，菜单可正常输入
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i)
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)
 
 # ⚠️ 管道模式：菜单无法输入（stdin 被占用），仅适合带参数的非交互调用
-curl -fsSL https://gitee.com/suser747/netool/raw/m/i | bash
+curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh | bash
 ```
 
 > **为什么推荐 `bash <(...)`？** 进程替换把 curl 输出重定向到一个临时文件描述符，bash 的 stdin 仍连接终端，菜单可以正常读取键盘输入。而 `curl | bash` 中 bash 的 stdin 被管道占用，`read` 会读到脚本内容而非键盘，菜单无法交互。
@@ -71,13 +71,13 @@ curl -fsSL https://gitee.com/suser747/netool/raw/m/i | bash
 把工具名和参数跟在后面即可，复制即用：
 
 ```bash
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) check          # 功能检查
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) status         # 状态面板
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) versions       # 组件版本
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) system info    # 系统信息
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) mirror --plan  # 换源预览（不改系统）
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) init           # 初始化向导
-bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) -q check       # 静默，仅错误
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) check          # 功能检查
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status         # 状态面板
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) versions       # 组件版本
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) system info    # 系统信息
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) mirror --plan  # 换源预览（不改系统）
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) init           # 初始化向导
+bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) -q check       # 静默，仅错误
 ```
 
 ### 1.3 设置短别名（可选）
@@ -86,7 +86,7 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i) -q check       # �
 
 ```bash
 # 写入 ~/.bashrc 后 source 生效
-echo "alias netool='bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i)'" >> ~/.bashrc
+echo "alias netool='bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)'" >> ~/.bashrc
 source ~/.bashrc
 
 # 之后直接用
@@ -107,7 +107,7 @@ netool mirror --plan
 | 问题 | 原因与处理 |
 |------|-----------|
 | 菜单不能输入 | 用了 `\| bash` 管道模式，改用 `bash <(curl ...)` 进程替换 |
-| 下载失败 | 检查能否访问 gitee.com；安装 `curl`；或改用[本地部署](#二本地直接使用) |
+| 下载失败 / 404 | 勿用 `raw/m/i`（不存在）；请用 **`raw/master/main.sh`**；确认能访问 gitee.com |
 | 中文乱码 | `export LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8` 后重试 |
 | 权限不足 | 改系统配置的命令加 `sudo`：`sudo bash <(curl ...) mirror -y` |
 
@@ -159,17 +159,17 @@ cd /opt/netool && git pull --ff-only origin master
 
 ### 2.5 curl 与本地命令对照
 
-curl 远程运行的命令只需把 `bash <(curl -fsSL https://gitee.com/suser747/netool/raw/m/i)` 替换成本地的 `./main.sh`，其余参数完全一样：
+curl 远程运行的命令只需把 `bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh)` 替换成本地的 `./main.sh`，其余参数完全一样：
 
 | 功能 | curl 远程 | 本地 |
 |------|-----------|------|
-| 进菜单 | `bash <(curl -fsSL .../m/i)` | `./main.sh` |
-| 功能检查 | `bash <(curl -fsSL .../m/i) check` | `./main.sh check` |
-| 状态面板 | `bash <(curl -fsSL .../m/i) status` | `./main.sh status` |
-| 换源预览 | `bash <(curl -fsSL .../m/i) mirror --plan` | `./main.sh mirror --plan` |
-| 初始化 | `bash <(curl -fsSL .../m/i) init` | `./main.sh init` |
+| 进菜单 | `bash <(curl -fsSL …/master/main.sh)` | `./main.sh` |
+| 功能检查 | `bash <(curl -fsSL …/master/main.sh) check` | `./main.sh check` |
+| 状态面板 | `bash <(curl -fsSL …/master/main.sh) status` | `./main.sh status` |
+| 换源预览 | `bash <(curl -fsSL …/master/main.sh) mirror --plan` | `./main.sh mirror --plan` |
+| 初始化 | `bash <(curl -fsSL …/master/main.sh) init` | `./main.sh init` |
 
-> 上表中 `.../m/i` 代表 `https://gitee.com/suser747/netool/raw/m/i`，完整命令见 [1.2 节](#12-直接执行工具推荐日常)。
+> 上表 `…/master/main.sh` = `https://gitee.com/suser747/netool/raw/master/main.sh`
 
 改系统配置类命令请加 `sudo`：`sudo ./main.sh mirror -y`
 
