@@ -176,7 +176,7 @@ analyze_dirs() {
 
   # du -x 只统计同一文件系统，防止跨文件系统统计虚拟/网络挂载点。
   # 这是有意设计: 若要分析 / 下所有非临时文件系统的挂载点，应改为遍历各挂载点分别执行 du。
-  du -x --max-depth="$depth" "${exclude_opts[@]}" "$target" 2>/dev/null \
+  du -x --max-depth="$depth" ${exclude_opts[@]+"${exclude_opts[@]}"} "$target" 2>/dev/null \
     | awk -v min="$min_bytes" '$1 * 1024 >= min {print $1*1024"\t"$2}' \
     | sort -rn \
     | head -n "$top" \

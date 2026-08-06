@@ -1955,7 +1955,7 @@ switch_apk_sources() {
 
   alpine_root="$(mirror_url_for alpine)"
   backup_file "$file"
-  run_cmd sed -E -i \
+  run_cmd sed "$(netool_sed_ere_opt)" -i \
     -e "s|https?://dl-cdn\\.alpinelinux\\.org/alpine|${alpine_root}|g" \
     -e "s|https?://dl-[0-9]+\\.alpinelinux\\.org/alpine|${alpine_root}|g" \
     -e "s#https?://(${mirror_hosts_regex})/alpine#${alpine_root}#g" \
@@ -1987,7 +1987,7 @@ switch_zypper_sources() {
     [[ -f "$file" ]] || continue
     file_count=$((file_count + 1))
     backup_file "$file"
-    run_cmd sed -E -i \
+    run_cmd sed "$(netool_sed_ere_opt)" -i \
       -e 's|^[[:space:]]*metalink=|# metalink=|g' \
       -e 's|^[[:space:]]*mirrorlist=|# mirrorlist=|g' \
       -e 's|^[[:space:]]*#([[:space:]]*baseurl=)|\1|g' \

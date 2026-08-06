@@ -50,6 +50,8 @@ bash <(curl -fsSL https://gitee.com/suser747/netool/raw/master/main.sh) status
 
 **要求：** Linux · Bash 3.2+ · 能访问 Gitee · 改配置需 `sudo`
 
+**最低建议环境：** CentOS 7 / Debian 9 / Ubuntu 16.04 及同类发行版（util-linux 2.23、systemd 219、GNU sed 4.2 等）。Bash 3.2+ 即可运行大部分功能；全能换源（lmirrors）需 Bash 4+。已做的旧系统兼容包括：无 `ss -H`、无 `MOUNTPOINTS`、无 `systemctl --now`、`sed -r`/`-E`、无 `lsblk -p`/`-s`、无 GNU `timeout`、Bash 3.2 空数组与 `mapfile` 替代。
+
 ### 1.1 进入交互菜单
 
 ```bash

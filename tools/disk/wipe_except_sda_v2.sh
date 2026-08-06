@@ -127,6 +127,11 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
+    log_error "此磁盘工具仅支持 Linux（当前：$(uname -s)）。"
+    exit 1
+fi
+
 # 加载公共函数库并获取 wipe 全局锁，避免多实例并发擦盘
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
@@ -188,16 +193,9 @@ echo
 
 # 不再硬编码 /dev/sda，改为动态检测根分区所在整盘加入保护列表
 PROTECT_DISKS=()
-
-ROOT_SRC="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
-if [ -n "$ROOT_SRC" ]; then
-    # 反向追溯根分区来源的整盘设备，加入保护列表
-    while read -r dev type; do
-        [ -n "$dev" ] || continue
-        if [ "$type" = "disk" ]; then
-            PROTECT_DISKS+=("$dev")
-        fi
-    done < <(lsblk -spnr -o NAME,TYPE "$ROOT_SRC" 2>/dev/null || true)
+root_disk="$(netool_lsblk_root_disk 2>/dev/null || true)"
+if [ -n "$root_disk" ]; then
+    PROTECT_DISKS+=("$root_disk")
 fi
 
 # -----------------------------------------------------------------------------
@@ -210,10 +208,10 @@ uniq_list() {
     printf '%s\n' "$@" | grep -v '^$' | sort -u
 }
 
-mapfile -t PROTECT_DISKS < <(uniq_list "${PROTECT_DISKS[@]}")
+netool_mapfile PROTECT_DISKS < <(uniq_list ${PROTECT_DISKS[@]+"${PROTECT_DISKS[@]}"})
 
 echo "保护盘:"
-printf '  %s\n' "${PROTECT_DISKS[@]}"
+printf '  %s\n' ${PROTECT_DISKS[@]+"${PROTECT_DISKS[@]}"}
 echo
 
 # -----------------------------------------------------------------------------
@@ -226,7 +224,7 @@ is_protected_disk() {
     local dev="$1"
     local p
 
-    for p in "${PROTECT_DISKS[@]}"; do
+    for p in ${PROTECT_DISKS[@]+"${PROTECT_DISKS[@]}"}; do
         if [ "$dev" = "$p" ]; then
             return 0
         fi
@@ -266,7 +264,7 @@ is_excluded_disk() {
     normalized_dev="$(normalize_dev "$dev" 2>/dev/null || echo "$dev")"
     IFS=',' read -r -a exclude_arr <<< "$EXCLUDE_DEVICES"
 
-    for item in "${exclude_arr[@]}"; do
+    for item in ${exclude_arr[@]+"${exclude_arr[@]}"}; do
         item="$(echo "$item" | sed 's/^ *//; s/ *$//')"
         [ -n "$item" ] || continue
         normalized_item="$(normalize_dev "$item" 2>/dev/null || echo "$item")"
@@ -284,7 +282,11 @@ TARGET_DISKS=()
 if [ -z "$DEVICES" ]; then
     if [ "$PLAN_ONLY" -eq 1 ]; then
         echo "未指定 --devices。可用整盘如下，请复制明确目标后再预览或执行:"
-        lsblk -dnpr -o NAME,SIZE,TYPE,MODEL,SERIAL | awk '$3=="disk"{print "  "$0}'
+        if lsblk -dnpr -o NAME,SIZE,TYPE,MODEL,SERIAL >/dev/null 2>&1; then
+            lsblk -dnpr -o NAME,SIZE,TYPE,MODEL,SERIAL | awk '$3=="disk"{print "  "$0}'
+        else
+            lsblk -dnr -o NAME,SIZE,TYPE,MODEL,SERIAL 2>/dev/null | awk '$3=="disk"{print "  /dev/"$0}'
+        fi
         echo
         echo "示例:"
         echo "  $0 --plan --devices /dev/sdX"
@@ -299,7 +301,7 @@ fi
 
 # 解析 --devices 逗号分隔列表，逐个校验: 必须是存在的整盘且非保护盘/排除盘
 IFS=',' read -r -a input_devices <<< "$DEVICES"
-for dev in "${input_devices[@]}"; do
+for dev in ${input_devices[@]+"${input_devices[@]}"}; do
     dev="$(normalize_dev "$dev" 2>/dev/null || true)"
     [ -n "$dev" ] || continue
 
@@ -308,7 +310,7 @@ for dev in "${input_devices[@]}"; do
         continue
     fi
 
-    type="$(lsblk -dnpr -o TYPE "$dev" 2>/dev/null | head -n1)"
+    type="$(netool_lsblk_dev_type "$dev")"
     if [ "$type" != "disk" ]; then
         echo "跳过非整盘设备: $dev"
         continue
@@ -327,7 +329,7 @@ for dev in "${input_devices[@]}"; do
     TARGET_DISKS+=("$dev")
 done
 
-mapfile -t TARGET_DISKS < <(uniq_list "${TARGET_DISKS[@]}")
+netool_mapfile TARGET_DISKS < <(uniq_list ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"})
 
 if [ "${#TARGET_DISKS[@]}" -eq 0 ]; then
     echo "没有需要清空的目标盘"
@@ -336,7 +338,7 @@ fi
 
 echo
 echo "即将清空以下整盘:"
-printf '  %s\n' "${TARGET_DISKS[@]}"
+printf '  %s\n' ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}
 echo
 
 echo "严重警告：除了保护盘以外，以上硬盘数据会被破坏。"
@@ -386,24 +388,24 @@ collect_stack() {
                 MD_STACK+=("$dev")
                 ;;
         esac
-    done < <(lsblk -nrpo NAME,TYPE "$disk" 2>/dev/null || true)
+    done < <(netool_lsblk_tree_name_type "$disk")
 }
 
 # 遍历所有目标盘收集设备树
-for disk in "${TARGET_DISKS[@]}"; do
+for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
     collect_stack "$disk"
 done
 
-mapfile -t TARGET_STACK < <(uniq_list "${TARGET_STACK[@]}")
-mapfile -t MD_STACK < <(uniq_list "${MD_STACK[@]}")
+netool_mapfile TARGET_STACK < <(uniq_list ${TARGET_STACK[@]+"${TARGET_STACK[@]}"})
+netool_mapfile MD_STACK < <(uniq_list ${MD_STACK[@]+"${MD_STACK[@]}"})
 
 echo "目标设备树:"
-printf '  %s\n' "${TARGET_STACK[@]}"
+printf '  %s\n' ${TARGET_STACK[@]+"${TARGET_STACK[@]}"}
 echo
 
 if [ "${#MD_STACK[@]}" -gt 0 ]; then
     echo "发现目标盘关联 mdadm 阵列:"
-    printf '  %s\n' "${MD_STACK[@]}"
+    printf '  %s\n' ${MD_STACK[@]+"${MD_STACK[@]}"}
 else
     echo "未从 lsblk 发现目标盘关联 mdadm 阵列"
 fi
@@ -425,7 +427,7 @@ is_in_target_stack() {
 
     real="$(readlink -f "$dev" 2>/dev/null || echo "$dev")"
 
-    for t in "${TARGET_STACK[@]}"; do
+    for t in ${TARGET_STACK[@]+"${TARGET_STACK[@]}"}; do
         treal="$(readlink -f "$t" 2>/dev/null || echo "$t")"
 
         if [ "$real" = "$treal" ]; then
@@ -454,7 +456,7 @@ echo
 echo "[2] 卸载目标设备挂载点..."
 
 # 卸载目标设备树中每个设备的所有挂载点，失败则强制懒卸载
-for dev in "${TARGET_STACK[@]}"; do
+for dev in ${TARGET_STACK[@]+"${TARGET_STACK[@]}"}; do
     [ -b "$dev" ] || continue
 
     while read -r mnt; do
@@ -486,17 +488,17 @@ if command -v pvs >/dev/null 2>&1; then
     done < <(pvs --noheadings --separator '|' -o pv_name,vg_name 2>/dev/null || true)
 
     if [ "${#VG_LIST[@]}" -gt 0 ]; then
-        mapfile -t VG_LIST < <(uniq_list "${VG_LIST[@]}")
+        netool_mapfile VG_LIST < <(uniq_list ${VG_LIST[@]+"${VG_LIST[@]}"})
     fi
 fi
 
 # 发现目标 VG 时先卸载其所有 LV 挂载点，再 vgchange -an 停用
 if [ "${#VG_LIST[@]}" -gt 0 ]; then
     echo "发现目标 VG:"
-    printf '  %s\n' "${VG_LIST[@]}"
+    printf '  %s\n' ${VG_LIST[@]+"${VG_LIST[@]}"}
 
     if command -v lvs >/dev/null 2>&1; then
-        for vg in "${VG_LIST[@]}"; do
+        for vg in ${VG_LIST[@]+"${VG_LIST[@]}"}; do
             while read -r lvpath; do
                 lvpath="$(echo "$lvpath" | xargs)"
                 [ -b "$lvpath" ] || continue
@@ -510,7 +512,7 @@ if [ "${#VG_LIST[@]}" -gt 0 ]; then
         done
     fi
 
-    for vg in "${VG_LIST[@]}"; do
+    for vg in ${VG_LIST[@]+"${VG_LIST[@]}"}; do
         [ -n "$vg" ] || continue
         echo "vgchange -an $vg"
         vgchange -an "$vg" || true
@@ -525,7 +527,7 @@ echo "[4] 停止目标盘相关 mdadm 阵列..."
 
 # 停止目标设备树中的 md 阵列，先卸载其挂载点再 mdadm --stop
 if [ "${#MD_STACK[@]}" -gt 0 ] && command -v mdadm >/dev/null 2>&1; then
-    for md in "${MD_STACK[@]}"; do
+    for md in ${MD_STACK[@]+"${MD_STACK[@]}"}; do
         [ -b "$md" ] || continue
 
         while read -r mnt; do
@@ -552,7 +554,7 @@ if command -v mdadm >/dev/null 2>&1; then
         [ -b "$md" ] || continue
 
         should_skip=0
-        for prot in "${PROTECT_DISKS[@]}"; do
+        for prot in ${PROTECT_DISKS[@]+"${PROTECT_DISKS[@]}"}; do
             if mdadm --detail "$md" 2>/dev/null | grep -qE "${prot}[0-9p]*$"; then
                 should_skip=1
                 break
@@ -583,7 +585,7 @@ echo
 echo "[6] 清除目标盘上的 RAID/LVM/文件系统签名..."
 
 # 遍历每个目标盘的子设备，依次清除 mdadm 超级块、LVM PV、wipefs 签名
-for disk in "${TARGET_DISKS[@]}"; do
+for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
     while read -r dev; do
         [ -b "$dev" ] || continue
 
@@ -598,7 +600,7 @@ for disk in "${TARGET_DISKS[@]}"; do
         fi
 
         wipefs -af "$dev" 2>/dev/null || true
-    done < <(lsblk -nrpo NAME "$disk" 2>/dev/null || true)
+    done < <(netool_lsblk_tree_names "$disk")
 done
 
 echo
@@ -606,7 +608,7 @@ echo
 echo "[7] 清空整盘分区表、头尾数据..."
 
 # 对每个目标整盘: sgdisk zap-all、wipefs、写零前 100MiB 与末尾 100MiB
-for disk in "${TARGET_DISKS[@]}"; do
+for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
     [ -b "$disk" ] || continue
 
     echo "清理整盘: $disk"
@@ -641,7 +643,7 @@ echo
 if [ "$MODE" = "discard" ]; then
     echo "[8] 执行 blkdiscard..."
 
-    for disk in "${TARGET_DISKS[@]}"; do
+    for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
         [ -b "$disk" ] || continue
         echo "blkdiscard -f $disk"
         blkdiscard -f "$disk" || echo "blkdiscard 失败或设备不支持: $disk"
@@ -650,7 +652,7 @@ if [ "$MODE" = "discard" ]; then
 elif [ "$MODE" = "zero" ]; then
     echo "[8] 全盘写零..."
 
-    for disk in "${TARGET_DISKS[@]}"; do
+    for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
         [ -b "$disk" ] || continue
         echo "全盘写零: $disk"
         dd if=/dev/zero of="$disk" bs=16M conv=fsync status=progress || true
@@ -666,7 +668,7 @@ echo
 echo "[9] 刷新内核分区表..."
 
 # 通知内核重新读取所有目标盘的分区表
-for disk in "${TARGET_DISKS[@]}"; do
+for disk in ${TARGET_DISKS[@]+"${TARGET_DISKS[@]}"}; do
     [ -b "$disk" ] || continue
 
     blockdev --rereadpt "$disk" 2>/dev/null || true
