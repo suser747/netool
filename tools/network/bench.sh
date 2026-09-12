@@ -4,7 +4,7 @@
 # ============================================================
 # 项目名称: netool懒人工具箱 (netool)
 # 脚本名称: bench.sh
-# 脚本版本: 2.0
+# 脚本版本: 1.0
 # 项目地址: https://gitee.com/suser747/netool
 #
 # 功能说明:
@@ -30,7 +30,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="bench-tools"
-SCRIPT_VERSION="2.0"
+SCRIPT_VERSION="1.0"
 
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"

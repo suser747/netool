@@ -4,7 +4,7 @@
 # =============================================================================
 # 项目名称: netool懒人工具箱 (netool)
 # 脚本名称: main
-# 脚本版本: 2.2
+# 脚本版本: 1.0
 # 项目地址: https://gitee.com/suser747/netool
 #
 # 功能说明:
@@ -51,7 +51,7 @@ else
 fi
 
 SCRIPT_VERSION="$(head -n1 "${SCRIPT_DIR}/VERSION" 2>/dev/null | tr -d '[:space:]')"
-SCRIPT_VERSION="${SCRIPT_VERSION:-2.3}"
+SCRIPT_VERSION="${SCRIPT_VERSION:-1.0}"
 
 # =============================================================================
 # 公共库 bootstrap：本地 tools/common.sh 优先；纯 curl 模式则临时下载

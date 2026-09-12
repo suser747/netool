@@ -4,7 +4,7 @@
 # ============================================================
 # 项目名称: netool懒人工具箱 (netool)
 # 脚本名称: ssh-port.sh
-# 脚本版本: 2.0
+# 脚本版本: 1.0
 # 项目地址: https://gitee.com/suser747/netool
 #
 # 功能说明:
@@ -31,7 +31,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="ssh-port-manager"
-SCRIPT_VERSION="2.0"
+SCRIPT_VERSION="1.0"
 REPO_URL="https://gitee.com/suser747/netool"
 SCRIPT_URL="https://gitee.com/suser747/netool/raw/master/tools/network/ssh-port.sh"
 BACKUP_ROOT="/var/backups/${SCRIPT_NAME}"
