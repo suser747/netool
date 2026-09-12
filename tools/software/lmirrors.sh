@@ -31,6 +31,16 @@ SCRIPT_VERSION="1.0"
 # shellcheck source=../load_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../load_common.sh"
 
+# 平台与 Bash 版本前置检查（须在 declare -A 等 Bash 4 语法执行前）
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
+  log_error "全能换源（lmirrors）仅支持 Linux（当前：$(uname -s 2>/dev/null || echo unknown)）。macOS 请使用菜单「轻量换源」或 Homebrew 工具。"
+  exit 1
+fi
+if (( BASH_VERSINFO[0] < 4 )); then
+  log_error "全能换源需要 Bash 4+（当前：${BASH_VERSION}）。请使用系统自带的较新 bash，或安装 bash 4 后重试。"
+  exit 1
+fi
+
 # -----------------------------------------------------------------------------
 # 运行方式
 #   本地：cd /opt/netool && ./main.sh lmirrors [参数...]

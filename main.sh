@@ -33,6 +33,12 @@
 
 set -Eeuo pipefail
 
+# Bash 3.2+（macOS 自带 / CentOS 7 等旧环境）
+if [[ "${BASH_VERSINFO[0]:-0}" -lt 3 ]] || { [[ "${BASH_VERSINFO[0]:-0}" -eq 3 ]] && [[ "${BASH_VERSINFO[1]:-0}" -lt 2 ]]; }; then
+  printf '[错误] 需要 Bash 3.2 或更高版本（当前: %s）。\n' "${BASH_VERSION:-未知}" >&2
+  exit 1
+fi
+
 SCRIPT_NAME="netool"
 REPO_URL="${NETOOL_REPO_URL:-https://gitee.com/suser747/netool}"
 LICENSE_VERSION="1"
@@ -488,13 +494,13 @@ run_status_panel() {
   fi
 
   status_section "网络"
-  if command_exists ip; then
-    status_line "主 IP" "$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}')"
-  elif command_exists hostname; then
-    status_line "主 IP" "$(hostname -I 2>/dev/null | awk '{print $1}' || echo 未知)"
-  fi
-  if command_exists ss; then
-    status_line "SSH 监听" "$(ss -tlnp 2>/dev/null | awk '/:22 |:2222 / {print $4; exit}' || echo 未检测到)"
+  local primary_ip
+  primary_ip="$(netool_primary_ip 2>/dev/null || true)"
+  status_line "主 IP" "${primary_ip:-未知}"
+  if command_exists ss || command_exists netstat; then
+    local ssh_listen
+    ssh_listen="$(netool_listening_tcp_local_addrs 2>/dev/null | awk -F: '{p=$NF; if(p==22||p==2222){print $0; exit}}')"
+    status_line "SSH 监听" "${ssh_listen:-未检测到}"
   fi
   if command_exists sysctl; then
     status_line "TCP 拥塞" "$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo 未知)"

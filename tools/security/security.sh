@@ -222,8 +222,8 @@ do_install() {
 
   # 优先使用 systemd；缺失时回退到 SysV service
   if command_exists systemctl; then
-    if ! systemctl enable --now fail2ban 2>/dev/null; then
-      log_warn "systemctl enable --now fail2ban 失败，请手动检查服务状态。"
+    if ! netool_systemctl_enable_now fail2ban; then
+      log_warn "启用 fail2ban 服务失败，请手动检查服务状态。"
     fi
   elif command_exists service; then
     if ! service fail2ban start 2>/dev/null; then
@@ -291,8 +291,8 @@ enable_ssh() {
 
   # 启用并重启 Fail2ban 服务，使新规则立即生效
   if command_exists systemctl; then
-    if ! systemctl enable --now fail2ban 2>/dev/null; then
-      log_warn "systemctl enable --now fail2ban 失败，请手动检查服务状态。"
+    if ! netool_systemctl_enable_now fail2ban; then
+      log_warn "启用 fail2ban 服务失败，请手动检查服务状态。"
     fi
     if ! systemctl restart fail2ban 2>/dev/null; then
       log_warn "systemctl restart fail2ban 失败，请手动检查服务状态。"

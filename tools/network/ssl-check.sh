@@ -116,7 +116,7 @@ check_one() {
 
   local cert_info=""
   # 通过 openssl 获取证书的到期日、颁发者、主题信息，超时 15 秒
-  cert_info="$(echo | timeout 15 openssl s_client -servername "$domain" -connect "${domain}:${port}" 2>/dev/null | openssl x509 -noout -enddate -issuer -subject 2>/dev/null || true)"
+  cert_info="$(echo | netool_run_timeout 15 openssl s_client -servername "$domain" -connect "${domain}:${port}" 2>/dev/null | openssl x509 -noout -enddate -issuer -subject 2>/dev/null || true)"
 
   if [[ -z "$cert_info" ]]; then
     printf "  %-40s %s连接失败%s\n" "$domain:${port}" "$COLOR_RED" "$COLOR_RESET"

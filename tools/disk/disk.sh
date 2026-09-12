@@ -141,7 +141,7 @@ EOF
 # -----------------------------------------------------------------------------
 passthrough_has_help() {
   local arg
-  for arg in "${PASSTHROUGH_ARGS[@]}"; do
+  for arg in ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}; do
     case "$arg" in
       -h|--help) return 0 ;;
     esac
@@ -159,6 +159,8 @@ passthrough_has_help() {
 #       只读属性与挂载情况标注状态 (只读/已挂载/空闲/分区)。
 # -----------------------------------------------------------------------------
 list_disks() {
+  local mount_col
+  mount_col="$(netool_lsblk_mount_col)"
   printf "\n磁盘概览：\n\n"
   printf "  %-10s %-8s %-8s %-10s %-14s %-6s\n" "磁盘" "容量" "类型" "文件系统" "挂载点" "状态"
   printf "  %s\n" "----------------------------------------------------------------"
@@ -191,7 +193,7 @@ list_disks() {
     [[ -z "$fstype" || "$fstype" == "0" ]] && fstype="-"
 
     printf "  %-10s %-8s %-8s %-10s %-14s %-6s\n" "$name" "$size" "$dtype" "$fstype" "$mount" "$status"
-  done < <(lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,RO 2>/dev/null | tail -n +2)
+  done < <(lsblk -o "NAME,SIZE,TYPE,FSTYPE,${mount_col},RO" 2>/dev/null | tail -n +2)
 
   printf "\n"
 }
@@ -204,13 +206,15 @@ list_disks() {
 # 说明: 通过 lsblk 检测，跳过 sr/fd/loop，仅保留既无挂载点也无分区的整盘。
 # -----------------------------------------------------------------------------
 get_free_disks() {
+  local mount_col
+  mount_col="$(netool_lsblk_mount_col)"
   FREE_DISKS=()
   while IFS= read -r line; do
     local name size
     name="$(awk '{print $1}' <<< "$line")"
     size="$(awk '{print $2}' <<< "$line")"
     local has_mount
-    has_mount="$(lsblk -n -o MOUNTPOINTS "/dev/${name}" 2>/dev/null | grep -v '^$' | head -1 || true)"
+    has_mount="$(lsblk -n -o "$mount_col" "/dev/${name}" 2>/dev/null | grep -v '^$' | head -1 || true)"
     local has_parts
     has_parts="$(lsblk -n -o NAME "/dev/${name}" 2>/dev/null | grep -v "^${name}$" | head -1 || true)"
 
@@ -692,7 +696,7 @@ confirm_phrase() {
 # 返回值: 透传子脚本退出码
 # -----------------------------------------------------------------------------
 do_slot_map() {
-  run_disk_subtool "disk_slot_map.sh" "${PASSTHROUGH_ARGS[@]}"
+  run_disk_subtool "disk_slot_map.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}
 }
 
 # -----------------------------------------------------------------------------
@@ -704,7 +708,7 @@ do_slot_map() {
 # -----------------------------------------------------------------------------
 do_smart_long() {
   if passthrough_has_help; then
-    run_disk_subtool "smart.sh" "${PASSTHROUGH_ARGS[@]}"
+    run_disk_subtool "smart.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}
     return $?
   fi
 
@@ -716,7 +720,7 @@ do_smart_long() {
     return 0
   fi
 
-  run_disk_subtool "smart.sh" "${PASSTHROUGH_ARGS[@]}"
+  run_disk_subtool "smart.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}
 }
 
 # -----------------------------------------------------------------------------
@@ -729,7 +733,7 @@ do_smart_long() {
 # -----------------------------------------------------------------------------
 do_full_rw_test() {
   if passthrough_has_help; then
-    run_disk_subtool "disk_full_rw_test.sh" "${PASSTHROUGH_ARGS[@]}" || return $?
+    run_disk_subtool "disk_full_rw_test.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"} || return $?
     return $?
   fi
 
@@ -749,29 +753,29 @@ do_full_rw_test() {
     return $?
   fi
 
-  if [[ " ${PASSTHROUGH_ARGS[*]} " != *" --yes "* && " ${PASSTHROUGH_ARGS[*]} " != *" --plan "* ]]; then
+  if [[ " ${PASSTHROUGH_ARGS[*]+"${PASSTHROUGH_ARGS[*]}"} " != *" --yes "* && " ${PASSTHROUGH_ARGS[*]+"${PASSTHROUGH_ARGS[*]}"} " != *" --plan "* ]]; then
     log_warn "硬盘好坏检测是破坏性全盘写入测试，必须先显式传 --plan 或 --yes。"
     log_info "建议先执行：disk full-rw-test --plan --devices /dev/sdX"
     return 1
   fi
 
-  if [[ " ${PASSTHROUGH_ARGS[*]} " == *" --plan "* ]]; then
-    run_disk_subtool "disk_full_rw_test.sh" "${PASSTHROUGH_ARGS[@]}" || return $?
+  if [[ " ${PASSTHROUGH_ARGS[*]+"${PASSTHROUGH_ARGS[*]}"} " == *" --plan "* ]]; then
+    run_disk_subtool "disk_full_rw_test.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"} || return $?
     return $?
   fi
 
   require_root
 
-  if [[ " ${PASSTHROUGH_ARGS[*]} " == *" --yes "* ]]; then
+  if [[ " ${PASSTHROUGH_ARGS[*]+"${PASSTHROUGH_ARGS[*]}"} " == *" --yes "* ]]; then
     log_warn "即将执行破坏性验盘：被测硬盘数据会被清空。"
     local plan_args=()
     local arg
-    for arg in "${PASSTHROUGH_ARGS[@]}"; do
+    for arg in ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}; do
       [[ "$arg" == "--yes" ]] && continue
       plan_args+=("$arg")
     done
     printf "\n先预览本次会被写入测试的硬盘：\n"
-    run_disk_subtool "disk_full_rw_test.sh" --plan "${plan_args[@]}" || return $?
+    run_disk_subtool "disk_full_rw_test.sh" --plan ${plan_args[@]+"${plan_args[@]}"} || return $?
     printf "\n"
     if ! confirm_phrase "请确认已经核对 --devices/--exclude 和目标盘清单。" "DESTROY-DISK-TEST"; then
       log_info "已取消。"
@@ -779,7 +783,7 @@ do_full_rw_test() {
     fi
   fi
 
-  run_disk_subtool "disk_full_rw_test.sh" "${PASSTHROUGH_ARGS[@]}"
+  run_disk_subtool "disk_full_rw_test.sh" ${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}
 }
 
 # -----------------------------------------------------------------------------
@@ -790,18 +794,19 @@ do_full_rw_test() {
 # 说明: 无 --devices 时只预览；非交互模式自动追加 --yes；--plan 不需 root。
 # -----------------------------------------------------------------------------
 do_wipe_except_system() {
-  local args=("${PASSTHROUGH_ARGS[@]}")
+  local args=()
+  args=(${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"})
   local has_devices=0
   local has_plan=0
   local has_yes=0
   local arg=""
 
   if passthrough_has_help; then
-    run_disk_subtool "wipe_except_sda_v2.sh" "${args[@]}"
+    run_disk_subtool "wipe_except_sda_v2.sh" ${args[@]+"${args[@]}"}
     return $?
   fi
 
-  for arg in "${args[@]}"; do
+  for arg in ${args[@]+"${args[@]}"}; do
     case "$arg" in
       --devices) has_devices=1 ;;
       --plan) has_plan=1 ;;
@@ -832,7 +837,7 @@ do_wipe_except_system() {
   fi
 
   log_warn "擦盘会清除 --devices 指定整盘上的分区表、文件系统签名和数据。"
-  run_disk_subtool "wipe_except_sda_v2.sh" "${args[@]}"
+  run_disk_subtool "wipe_except_sda_v2.sh" ${args[@]+"${args[@]}"}
 }
 
 # -----------------------------------------------------------------------------

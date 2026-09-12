@@ -314,13 +314,7 @@ detect_service_name() {
 # 返回值: 0 - 始终成功
 # ------------------------------------------------------------------------------
 detect_primary_ip() {
-  if command_exists ip; then
-    PRIMARY_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
-  fi
-
-  if [[ -z "$PRIMARY_IP" ]] && command_exists hostname; then
-    PRIMARY_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  fi
+  PRIMARY_IP="$(netool_primary_ip)"
 }
 
 # ------------------------------------------------------------------------------
@@ -362,18 +356,18 @@ detect_config_ports() {
 # 返回值: 0 - 始终成功
 # ------------------------------------------------------------------------------
 load_current_ports() {
-  mapfile -t CURRENT_PORTS < <(detect_effective_ports)
+  netool_mapfile CURRENT_PORTS < <(detect_effective_ports)
 
   if ((${#CURRENT_PORTS[@]} == 0)); then
-    mapfile -t CURRENT_PORTS < <(detect_config_ports)
+    netool_mapfile CURRENT_PORTS < <(detect_config_ports)
   fi
 
   if ((${#CURRENT_PORTS[@]} == 0)); then
     CURRENT_PORTS=("22")
   fi
 
-  if [[ -n "$CURRENT_SESSION_PORT" ]] && ! array_contains "$CURRENT_SESSION_PORT" "${CURRENT_PORTS[@]}"; then
-    mapfile -t CURRENT_PORTS < <(unique_ports "$CURRENT_SESSION_PORT" "${CURRENT_PORTS[@]}")
+  if [[ -n "$CURRENT_SESSION_PORT" ]] && ! array_contains "$CURRENT_SESSION_PORT" ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"}; then
+    netool_mapfile CURRENT_PORTS < <(unique_ports "$CURRENT_SESSION_PORT" ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"})
   fi
 }
 
@@ -473,7 +467,7 @@ show_detected_state() {
   print_kv "配置文件" "$SSHD_CONFIG"
   print_kv "管理文件" "$MANAGED_FILE"
   print_kv "当前会话端口" "${CURRENT_SESSION_PORT:-未检测到 SSH 会话}"
-  print_kv "当前生效端口" "$(format_ports "${CURRENT_PORTS[@]}")"
+  print_kv "当前生效端口" "$(format_ports ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"})"
   print_kv "服务器地址" "${PRIMARY_IP:-未检测到}"
   print_kv "SELinux" "$SELINUX_MODE"
   print_kv "防火墙工具" "${FIREWALL_TOOL:-未检测到可自动处理的防火墙}"
@@ -502,17 +496,8 @@ validate_port_number() {
 ensure_port_available() {
   local port="$1"
 
-  if command_exists ss; then
-    if ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "(^|[\\]:])${port}$"; then
-      die "端口 ${port} 已被其他服务占用,请更换一个端口。"
-    fi
-    return 0
-  fi
-
-  if command_exists netstat; then
-    if netstat -ltn 2>/dev/null | awk 'NR > 2 {print $4}' | grep -Eq "(^|[\\]:])${port}$"; then
-      die "端口 ${port} 已被其他服务占用,请更换一个端口。"
-    fi
+  if netool_listening_tcp_local_addrs 2>/dev/null | grep -Eq "(^|[\\]:])${port}$"; then
+    die "端口 ${port} 已被其他服务占用,请更换一个端口。"
   fi
 }
 
@@ -541,7 +526,7 @@ prompt_new_port() {
   if [[ -n "$NEW_PORT" ]]; then
     validate_port_number "$NEW_PORT" || { log_error "端口 ${NEW_PORT} 不合法,请输入 1 到 65535 之间的整数。"; return 1; }
 
-    if array_contains "$NEW_PORT" "${CURRENT_PORTS[@]}"; then
+    if array_contains "$NEW_PORT" ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"}; then
       if [[ "${MODE:-}" == "replace" ]] && ((${#CURRENT_PORTS[@]} > 1)); then
         return 0
       fi
@@ -575,7 +560,7 @@ prompt_new_port() {
       continue
     }
 
-    if array_contains "$input" "${CURRENT_PORTS[@]}"; then
+    if array_contains "$input" ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"}; then
       log_warn "端口 ${input} 已经在当前 SSH 配置中启用。"
 
       if ((${#CURRENT_PORTS[@]} > 1)) && confirm_default_no "如果你是想保留端口 ${input} 并删除其他旧端口,是否按 replace 方式继续?"; then
@@ -665,7 +650,7 @@ EOF
 # ------------------------------------------------------------------------------
 prepare_target_ports() {
   if [[ "$MODE" == "staged" ]]; then
-    mapfile -t TARGET_PORTS < <(unique_ports "${CURRENT_PORTS[@]}" "$NEW_PORT")
+    netool_mapfile TARGET_PORTS < <(unique_ports ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"} "$NEW_PORT")
   else
     TARGET_PORTS=("$NEW_PORT")
   fi
@@ -681,7 +666,7 @@ show_plan() {
   start_section "变更计划"
   print_kv "执行方式" "$(mode_label "$MODE")"
   print_kv "新增端口" "$NEW_PORT"
-  print_kv "变更后端口" "$(format_ports "${TARGET_PORTS[@]}")"
+  print_kv "变更后端口" "$(format_ports ${TARGET_PORTS[@]+"${TARGET_PORTS[@]}"})"
 
   if [[ "$MODE" == "staged" ]]; then
     log_warn "本次会同时保留旧端口和新端口,方便你先验证新端口是否可用。"
@@ -761,8 +746,8 @@ created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 action=${ACTION}
 mode=${MODE:-restore}
 new_port=${NEW_PORT:-}
-current_ports=$(format_ports "${CURRENT_PORTS[@]}")
-target_ports=$(format_ports "${TARGET_PORTS[@]}")
+current_ports=$(format_ports ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"})
+target_ports=$(format_ports ${TARGET_PORTS[@]+"${TARGET_PORTS[@]}"})
 managed_file=${MANAGED_FILE}
 managed_file_present=${managed_present}
 EOF
@@ -901,31 +886,26 @@ detect_listening_ports() {
   local port=""
   local ports=()
   local matched=()
+  local ere
+  ere="$(netool_sed_ere_opt)"
 
-  if command_exists ss; then
-    while IFS= read -r port; do
-      [[ -n "$port" ]] && ports+=("$port")
-    done < <(ss -ltnH 2>/dev/null | awk '{print $4}' | sed -E 's/.*[:]([0-9]+)$/\1/' | sort -n | awk '!seen[$0]++')
-  fi
-
-  if ((${#ports[@]} == 0)) && command_exists netstat; then
-    while IFS= read -r port; do
-      [[ -n "$port" ]] && ports+=("$port")
-    done < <(netstat -ltn 2>/dev/null | awk 'NR > 2 {print $4}' | sed -E 's/.*[:]([0-9]+)$/\1/' | sort -n | awk '!seen[$0]++')
-  fi
+  while IFS= read -r port; do
+    [[ -n "$port" ]] && ports+=("$port")
+  done < <(netool_listening_tcp_local_addrs 2>/dev/null | sed "$ere" 's/.*[:]([0-9]+)$/\1/' | sort -n | awk '!seen[$0]++')
 
   if (($# == 0)); then
-    printf "%s\n" "${ports[@]}"
+    # Bash 3.2 + set -u：空数组不可直接 "${ports[@]}"
+    ((${#ports[@]})) && printf "%s\n" "${ports[@]}"
     return 0
   fi
 
   for port in "$@"; do
-    if array_contains "$port" "${ports[@]}"; then
+    if array_contains "$port" ${ports[@]+"${ports[@]}"}; then
       matched+=("$port")
     fi
   done
 
-  printf "%s\n" "${matched[@]}"
+  ((${#matched[@]})) && printf "%s\n" "${matched[@]}"
 }
 
 # ------------------------------------------------------------------------------
@@ -1196,7 +1176,7 @@ show_apply_summary() {
       live_ports=()
       while IFS= read -r port; do
         [[ -n "$port" ]] && live_ports+=("$port")
-      done < <(detect_listening_ports "${TARGET_PORTS[@]}")
+      done < <(detect_listening_ports ${TARGET_PORTS[@]+"${TARGET_PORTS[@]}"})
 
       if ((${#live_ports[@]} > 0)); then
         break
@@ -1209,13 +1189,13 @@ show_apply_summary() {
 
   start_section "执行结果"
   print_kv "执行方式" "$(mode_label "$MODE")"
-  print_kv "旧端口" "$(format_ports "${CURRENT_PORTS[@]}")"
+  print_kv "旧端口" "$(format_ports ${CURRENT_PORTS[@]+"${CURRENT_PORTS[@]}"})"
   print_kv "新端口" "$NEW_PORT"
-  print_kv "当前目标端口" "$(format_ports "${TARGET_PORTS[@]}")"
+  print_kv "当前目标端口" "$(format_ports ${TARGET_PORTS[@]+"${TARGET_PORTS[@]}"})"
   print_kv "备份目录" "${BACKUP_DIR:-未创建}"
 
   if ((${#live_ports[@]} > 0)); then
-    print_kv "SSH 监听端口" "$(format_ports "${live_ports[@]}")"
+    print_kv "SSH 监听端口" "$(format_ports ${live_ports[@]+"${live_ports[@]}"})"
   fi
 
   if [[ "$MODE" == "staged" ]]; then
@@ -1250,12 +1230,14 @@ prompt_finalize_replace() {
 # 返回值: 透传子函数退出码
 # ------------------------------------------------------------------------------
 finalize_replace_after_stage() {
-  local staged_ports=("${TARGET_PORTS[@]}")
+  local staged_ports=()
+  staged_ports=(${TARGET_PORTS[@]+"${TARGET_PORTS[@]}"})
 
   start_section "正式切换"
   log_info "即将删除旧端口,仅保留 ${NEW_PORT}。"
 
-  CURRENT_PORTS=("${staged_ports[@]}")
+  CURRENT_PORTS=()
+  CURRENT_PORTS=(${staged_ports[@]+"${staged_ports[@]}"})
   TARGET_PORTS=("$NEW_PORT")
   MODE="replace"
   BACKUP_DIR=""

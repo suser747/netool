@@ -185,37 +185,38 @@ init_linux_vars() {
 # 镜像源配置
 # ============================================================
 # 国内镜像源列表（bottles + pip + git 三合一）
-# 格式: 编号:名称:bottles地址:pip地址:git地址
+# 格式: 编号|名称|bottles地址|pip地址|git地址（用 | 分隔，避免 URL 中的 :// 被拆坏）
 # - bottles 地址: HOMEBREW_BOTTLE_DOMAIN，预编译二进制包下载地址
 # - pip 地址:     HOMEBREW_PIP_INDEX_URL，pip 安装 Python 包时使用的源
 # - git 地址:     Homebrew 仓库的 git 镜像地址（部分镜像不提供，留空）
+# 注意：须兼容 macOS 自带 Bash 3.2（禁用 declare -A / local -n）
 MIRRORS=(
-  "1:中科大:https://mirrors.ustc.edu.cn/homebrew-bottles:https://pypi.mirrors.ustc.edu.cn/simple:https://mirrors.ustc.edu.cn/git/homebrew"
-  "2:清华大学:https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles:https://pypi.tuna.tsinghua.edu.cn/simple:https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
-  "3:上海交通大学:https://mirror.sjtu.edu.cn/homebrew-bottles:https://mirror.sjtu.edu.cn/pypi/web/simple:"
-  "4:腾讯:https://mirrors.cloud.tencent.com/homebrew-bottles:https://mirrors.cloud.tencent.com/pypi/simple:"
-  "5:阿里巴巴:https://mirrors.aliyun.com/homebrew/homebrew-bottles:http://mirrors.aliyun.com/pypi/simple:"
+  "1|中科大|https://mirrors.ustc.edu.cn/homebrew-bottles|https://pypi.mirrors.ustc.edu.cn/simple|https://mirrors.ustc.edu.cn/git/homebrew"
+  "2|清华大学|https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles|https://pypi.tuna.tsinghua.edu.cn/simple|https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
+  "3|上海交通大学|https://mirror.sjtu.edu.cn/homebrew-bottles|https://mirror.sjtu.edu.cn/pypi/web/simple|"
+  "4|腾讯|https://mirrors.cloud.tencent.com/homebrew-bottles|https://mirrors.cloud.tencent.com/pypi/simple|"
+  "5|阿里巴巴|https://mirrors.aliyun.com/homebrew/homebrew-bottles|http://mirrors.aliyun.com/pypi/simple|"
 )
 
 # 仅 Git 仓库地址的镜像源列表（用于仅更换仓库地址的场景）
+# 与 MIRRORS 同为 5 段：编号|名称|bottles|pip|git（前两段 URL 留空）
 GIT_ONLY_MIRRORS=(
-  "1:清华大学:https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
-  "2:Gitee:https://gitee.com/Homebrew2"
+  "1|清华大学|||https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
+  "2|Gitee|||https://gitee.com/Homebrew2"
 )
 
 # 卸载脚本源（用于下载官方 uninstall.sh）
 UNINSTALL_MIRRORS=(
-  "1:清华大学源:https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
-  "2:Gitee源:https://gitee.com/Homebrew2"
+  "1|清华大学源|https://mirrors.tuna.tsinghua.edu.cn/git/homebrew"
+  "2|Gitee源|https://gitee.com/Homebrew2"
 )
 
-# 当前选中的镜像源配置（关联数组，结构清晰避免字符串拼接）
-declare -A MIRROR_CONFIG=(
-  ["name"]=""
-  ["bottle_url"]=""
-  ["pip_url"]=""
-  ["git_url"]=""
-)
+# 当前选中的镜像源配置（普通变量，兼容 Bash 3.2）
+MIRROR_NAME=""
+MIRROR_BOTTLE_URL=""
+MIRROR_PIP_URL=""
+MIRROR_GIT_URL=""
+SELECTED_SIMPLE_MIRROR_URL=""
 
 # ============================================================
 # 通用工具函数
@@ -464,8 +465,8 @@ remove_env_variables() {
 # -----------------------------------------------------------------------------
 write_env_variables() {
   local shell_profile="$1"
-  local bottle_url="${MIRROR_CONFIG["bottle_url"]}"
-  local pip_url="${MIRROR_CONFIG["pip_url"]}"
+  local bottle_url="${MIRROR_BOTTLE_URL}"
+  local pip_url="${MIRROR_PIP_URL}"
 
   if env_vars_exist "${shell_profile}"; then
     log_warn "检测到已存在 Homebrew 环境变量，跳过写入"
@@ -528,7 +529,7 @@ check_network() {
 
 # -----------------------------------------------------------------------------
 # 函数: check_macos_version
-# 功能: macOS 版本检查，Homebrew 最低要求 macOS 10.15 (Catalina)，使用 sort -V 进行版本比较
+# 功能: macOS 版本检查，Homebrew 最低要求 macOS 10.15 (Catalina)，使用 netool_sort_version 进行版本比较
 # 参数: 无
 # 返回值: 无（版本符合要求时打印日志，过低时 exit 1）
 # -----------------------------------------------------------------------------
@@ -539,8 +540,8 @@ check_macos_version() {
     return 0
   fi
   local min_version="10.15"
-  # 使用 sort -V 进行版本号比较，避免字符串比较导致 10.15 被误判为低于 10.9
-  if [[ "$(printf '%s\n%s\n' "$min_version" "$macos_version" | sort -V | head -n1)" == "$macos_version" && "$macos_version" != "$min_version" ]]; then
+  # 使用 netool_sort_version 进行版本号比较，避免字符串比较导致 10.15 被误判为低于 10.9
+  if [[ "$(printf '%s\n%s\n' "$min_version" "$macos_version" | netool_sort_version | head -n1)" == "$macos_version" && "$macos_version" != "$min_version" ]]; then
     log_error "您的 macOS 版本 ${macos_version} 过低，Homebrew 需要 macOS ${min_version} 或更高版本"
     log_error "建议升级系统或使用 MacPorts 替代"
     exit 1
@@ -605,22 +606,24 @@ warning_if() {
 
 # -----------------------------------------------------------------------------
 # 函数: select_mirror
-# 功能: 交互式选择镜像源（bottles + pip + git 三合一），结果写入 MIRROR_CONFIG 关联数组
-# 参数: $1 - 提示标题; $2 - 镜像源数组名（通过 nameref 传递）; $3 - 默认选中的编号
-# 返回值: 始终 0（选择成功后写入全局 MIRROR_CONFIG）
+# 功能: 交互式选择镜像源（bottles + pip + git 三合一），结果写入全局 MIRROR_* 变量
+# 参数: $1 - 提示标题; $2 - 镜像源数组名（字符串，Bash 3.2 用 eval 间接展开）; $3 - 默认选中的编号
+# 返回值: 0 选择成功；1 读取失败
 # -----------------------------------------------------------------------------
 select_mirror() {
   local title="$1"
-  local -n mirrors="$2"
+  local array_name="$2"
   local default="$3"
+  local mirror num name bottle_url pip_url git_url input
+  local -a mirrors
+  eval "mirrors=(\"\${${array_name}[@]}\")"
 
   echo -e "\n${tty_green}${title}${tty_reset}"
   for mirror in "${mirrors[@]}"; do
-    IFS=':' read -r num name _ _ _ <<< "${mirror}"
+    IFS='|' read -r num name _ _ _ <<< "${mirror}"
     echo "${tty_blue}${num}${tty_reset}、${name}"
   done
 
-  local input
   # 非交互(-y)/预览(--plan)模式: 直接使用默认值，不阻塞 read
   if [[ "${YES:-0}" == "1" || "${DRY_RUN:-0}" == "1" ]]; then
     input="${default}"
@@ -634,39 +637,42 @@ select_mirror() {
   fi
 
   for mirror in "${mirrors[@]}"; do
-    IFS=':' read -r num name bottle_url pip_url git_url <<< "${mirror}"
+    IFS='|' read -r num name bottle_url pip_url git_url <<< "${mirror}"
     if [[ "${num}" == "${input}" ]]; then
       echo "${tty_green}已选择 ${name}${tty_reset}"
-      MIRROR_CONFIG["name"]="${name}"
-      MIRROR_CONFIG["bottle_url"]="${bottle_url}"
-      MIRROR_CONFIG["pip_url"]="${pip_url}"
-      MIRROR_CONFIG["git_url"]="${git_url}"
+      MIRROR_NAME="${name}"
+      MIRROR_BOTTLE_URL="${bottle_url}"
+      MIRROR_PIP_URL="${pip_url}"
+      MIRROR_GIT_URL="${git_url}"
       return 0
     fi
   done
 
   log_error "无效的选择，请重新输入"
-  select_mirror "${title}" mirrors "${default}"
+  select_mirror "${title}" "${array_name}" "${default}"
 }
 
 # -----------------------------------------------------------------------------
 # 函数: select_simple_mirror
-# 功能: 交互式选择仅含 URL 的镜像源（用于卸载场景），输出选中的 URL
-# 参数: $1 - 提示标题; $2 - 镜像源数组名（通过 nameref 传递）; $3 - 默认选中的编号
-# 返回值: 始终 0（通过 stdout 输出选中的 URL）
+# 功能: 交互式选择仅含 URL 的镜像源（用于卸载场景），结果写入 SELECTED_SIMPLE_MIRROR_URL
+# 参数: $1 - 提示标题; $2 - 镜像源数组名（字符串）; $3 - 默认选中的编号
+# 返回值: 0 选择成功；1 读取失败
 # -----------------------------------------------------------------------------
 select_simple_mirror() {
   local title="$1"
-  local -n mirrors="$2"
+  local array_name="$2"
   local default="$3"
+  local mirror num name url input
+  local -a mirrors
+  eval "mirrors=(\"\${${array_name}[@]}\")"
+  SELECTED_SIMPLE_MIRROR_URL=""
 
   echo -e "\n${tty_green}${title}${tty_reset}"
   for mirror in "${mirrors[@]}"; do
-    IFS=':' read -r num name url <<< "${mirror}"
+    IFS='|' read -r num name url <<< "${mirror}"
     echo "${tty_blue}${num}${tty_reset}、${name}"
   done
 
-  local input
   # 非交互(-y)/预览(--plan)模式: 直接使用默认值，不阻塞 read
   if [[ "${YES:-0}" == "1" || "${DRY_RUN:-0}" == "1" ]]; then
     input="${default}"
@@ -680,16 +686,16 @@ select_simple_mirror() {
   fi
 
   for mirror in "${mirrors[@]}"; do
-    IFS=':' read -r num name url <<< "${mirror}"
+    IFS='|' read -r num name url <<< "${mirror}"
     if [[ "${num}" == "${input}" ]]; then
       echo "${tty_green}已选择 ${name}${tty_reset}"
-      echo "${url}"
+      SELECTED_SIMPLE_MIRROR_URL="${url}"
       return 0
     fi
   done
 
   log_error "无效的选择，请重新输入"
-  select_simple_mirror "${title}" mirrors "${default}"
+  select_simple_mirror "${title}" "${array_name}" "${default}"
 }
 
 # ============================================================
@@ -744,7 +750,7 @@ error_game_over() {
 # -----------------------------------------------------------------------------
 # 函数: start_clone_brew
 # 功能: 核心安装函数，克隆并执行官方 install.sh，包含 sed 替换镜像地址与 bash -n 语法校验
-# 参数: 无（读取全局 MIRROR_CONFIG）
+# 参数: 无（读取全局 MIRROR_* 变量）
 # 返回值: 无（失败时 exit 1）
 # -----------------------------------------------------------------------------
 # 核心安装函数: 克隆并执行官方 install.sh
@@ -759,8 +765,8 @@ error_game_over() {
 #   8. 执行修改后的 install.sh
 #   9. 清理临时目录
 start_clone_brew() {
-  local git_url="${MIRROR_CONFIG["git_url"]}"
-  local bottle_url="${MIRROR_CONFIG["bottle_url"]}"
+  local git_url="${MIRROR_GIT_URL}"
+  local bottle_url="${MIRROR_BOTTLE_URL}"
 
   # --plan/--dry-run 预览模式: 仅打印将执行的操作，不实际克隆/安装
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -874,11 +880,11 @@ start_clone_brew() {
 # -----------------------------------------------------------------------------
 # 函数: update_brew_remote
 # 功能: 仅更新已安装 brew 的仓库远程地址（不重新安装），用于"仅更换 brew 仓库地址"场景
-# 参数: 无（读取全局 MIRROR_CONFIG）
+# 参数: 无（读取全局 MIRROR_* 变量）
 # 返回值: 无（失败时 exit 1）
 # -----------------------------------------------------------------------------
 update_brew_remote() {
-  local git_url="${MIRROR_CONFIG["git_url"]}"
+  local git_url="${MIRROR_GIT_URL}"
 
   if [[ -z "${git_url}" ]]; then
     log_error "所选镜像源未提供 Git 仓库地址"
@@ -965,8 +971,12 @@ install_homebrew() {
     log_info "系统版本: ${macos_version}"
   fi
 
-  # 前置检查：网络、macOS 版本、Git 依赖
-  check_network
+  # 前置检查：网络（--plan 跳过强制检测）、macOS 版本、Git 依赖
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    log_info "[预览模式] 跳过网络连通性强制检测"
+  else
+    check_network
+  fi
   check_macos_version
   check_git
 
@@ -1131,8 +1141,12 @@ uninstall_homebrew() {
   check_admin
 
   # 选择卸载脚本源
-  local mirror_url
-  mirror_url=$(select_simple_mirror "请选择卸载脚本源：" UNINSTALL_MIRRORS "1")
+  select_simple_mirror "请选择卸载脚本源：" UNINSTALL_MIRRORS "1" || return 1
+  local mirror_url="${SELECTED_SIMPLE_MIRROR_URL}"
+  if [[ -z "${mirror_url}" ]]; then
+    log_error "未获得有效的卸载脚本源地址"
+    return 1
+  fi
 
   # 二次确认（破坏性操作，需输入 yes 才能继续；受 -y/--plan 控制）
   echo -e "\n${tty_red}=========================================${tty_reset}"
@@ -1355,54 +1369,64 @@ install_git() {
 
 # -----------------------------------------------------------------------------
 # 函数: main_menu
-# 功能: 主菜单，循环展示安装/卸载/安装 CLT 选项，-y 模式下自动选择安装
+# 功能: 主菜单循环，展示安装/卸载/安装 CLT 选项；b 返回上层，0 退出
 # 参数: 无
-# 返回值: 无（用户选择退出时 exit 0）
+# 返回值: 0（用户选择返回时）
 # -----------------------------------------------------------------------------
 main_menu() {
-  echo -e "\n${tty_green}=========================================${tty_reset}"
-  echo -e "${tty_green}    netool懒人工具箱 - Homebrew 管理工具${tty_reset}"
-  echo -e "${tty_green}    版本: ${SCRIPT_VERSION}${tty_reset}"
-  echo -e "${tty_green}=========================================${tty_reset}"
-  echo ""
-  echo "${tty_blue}1${tty_reset}、安装/配置 Homebrew"
-  echo "${tty_blue}2${tty_reset}、卸载 Homebrew"
-  echo "${tty_blue}3${tty_reset}、安装 Command Line Tools (Git)"
-  echo "${tty_blue}0${tty_reset}、退出"
-  echo ""
   local choice
-  # -y/--yes 完全非交互模式: 直接使用默认值 1（安装），不阻塞 read
-  # --plan/--dry-run 模式: 仍由用户选择要预览的操作
-  if [[ "${YES:-0}" == "1" ]]; then
-    choice="1"
-    echo "1"
-  else
-    if ! read_prompt "${tty_cyan}请选择操作 [默认: 1]: ${tty_reset}" choice; then
-      log_error "无法读取输入。"
-      exit 1
+  while true; do
+    echo -e "\n${tty_green}=========================================${tty_reset}"
+    echo -e "${tty_green}    netool懒人工具箱 - Homebrew 管理工具${tty_reset}"
+    echo -e "${tty_green}    版本: ${SCRIPT_VERSION}${tty_reset}"
+    echo -e "${tty_green}=========================================${tty_reset}"
+    echo ""
+    echo "${tty_blue}1${tty_reset}、安装/配置 Homebrew"
+    echo "${tty_blue}2${tty_reset}、卸载 Homebrew"
+    echo "${tty_blue}3${tty_reset}、安装 Command Line Tools (Git)"
+    echo "${tty_blue}b${tty_reset}、返回"
+    echo "${tty_blue}0${tty_reset}、退出"
+    print_menu_nav_hint
+    echo ""
+    # -y/--yes 完全非交互模式: 直接使用默认值 1（安装），不阻塞 read
+    # --plan/--dry-run 模式: 仍由用户选择要预览的操作
+    if [[ "${YES:-0}" == "1" ]]; then
+      choice="1"
+      echo "1"
+    else
+      if ! read_prompt "${tty_cyan}请选择操作 [默认: 1]: ${tty_reset}" choice; then
+        log_error "无法读取输入。"
+        return 1
+      fi
+      choice="${choice:-1}"
     fi
-    choice="${choice:-1}"
-  fi
 
-  case "${choice}" in
-    1)
-      install_homebrew
-      ;;
-    2)
-      uninstall_homebrew
-      ;;
-    3)
-      install_git
-      ;;
-    0)
-      log_info "感谢使用 netool懒人工具箱！"
-      exit 0
-      ;;
-    *)
-      log_error "无效的选择"
-      main_menu
-      ;;
-  esac
+    case "${choice}" in
+      1)
+        install_homebrew
+        [[ "${YES:-0}" == "1" ]] && return 0
+        ;;
+      2)
+        uninstall_homebrew
+        [[ "${YES:-0}" == "1" ]] && return 0
+        ;;
+      3)
+        install_git
+        [[ "${YES:-0}" == "1" ]] && return 0
+        ;;
+      b|B|back|返回)
+        log_info "已返回。"
+        return 0
+        ;;
+      0)
+        log_info "感谢使用 netool懒人工具箱！"
+        exit 0
+        ;;
+      *)
+        log_error "无效的选择，请输入 1-3、b 返回或 0 退出"
+        ;;
+    esac
+  done
 }
 
 # ============================================================

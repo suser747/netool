@@ -220,7 +220,7 @@ cleanup_failed_install() {
 ## 返回值: 0 启用成功或无可用服务管理器；非 0 启用失败
 enable_docker_service() {
   if command_exists systemctl; then
-    systemctl enable --now docker 2>/dev/null || true
+    netool_systemctl_enable_now docker || true
   elif command_exists service; then
     service docker start 2>/dev/null || true
   fi

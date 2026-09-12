@@ -188,6 +188,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
+    log_error "此磁盘工具仅支持 Linux（当前：$(uname -s)）。"
+    exit 1
+fi
+
 if ! is_positive_int "$DISK_CONCURRENCY"; then
     echo "--concurrency 必须是正整数"
     exit 1
@@ -282,7 +287,7 @@ device_is_excluded() {
     ndev="$(normalize_dev "$dev" 2>/dev/null || echo "$dev")"
     IFS=',' read -r -a exclude_arr <<< "$EXCLUDE_DEVICES"
 
-    for item in "${exclude_arr[@]}"; do
+    for item in ${exclude_arr[@]+"${exclude_arr[@]}"}; do
         item="$(echo "$item" | sed 's/^ *//; s/ *$//')"
         [[ -n "$item" ]] || continue
 
@@ -304,7 +309,11 @@ device_is_excluded() {
 # -----------------------------------------------------------------------------
 disk_has_mountpoint() {
     local dev="$1"
-    lsblk -nrpo MOUNTPOINT "$dev" 2>/dev/null | grep -q '[^[:space:]]'
+    if lsblk -nrpo MOUNTPOINT "$dev" >/dev/null 2>&1; then
+        lsblk -nrpo MOUNTPOINT "$dev" 2>/dev/null | grep -q '[^[:space:]]'
+    else
+        lsblk -nro MOUNTPOINT "$dev" 2>/dev/null | grep -q '[^[:space:]]'
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -645,7 +654,7 @@ build_device_list() {
             result+=("$dev")
         done
 
-        printf '%s\n' "${result[@]}"
+        ((${#result[@]})) && printf '%s\n' "${result[@]}"
         return
     fi
 
@@ -676,9 +685,9 @@ build_device_list() {
         fi
 
         result+=("$dev")
-    done < <(lsblk -dnpo NAME,TYPE | awk '$2=="disk"{print $1}')
+    done < <(netool_lsblk_disk_paths)
 
-    printf '%s\n' "${result[@]}"
+    ((${#result[@]})) && printf '%s\n' "${result[@]}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1069,7 +1078,7 @@ main() {
         log "输出目录: $OUT_BASE"
     fi
 
-    mapfile -t TEST_DEVS < <(build_device_list)
+    netool_mapfile TEST_DEVS < <(build_device_list)
 
     if [[ "${#TEST_DEVS[@]}" -eq 0 ]]; then
         echo "没有找到可测试硬盘。"

@@ -90,20 +90,13 @@ uniq_list() {
 #       将该整盘设备路径加入保护列表并去重。
 # -----------------------------------------------------------------------------
 detect_root_disk() {
-    local root_src
-    root_src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
-
-    if [ -n "$root_src" ]; then
-        # 反向追溯根分区来源的整盘设备，加入保护列表
-        while read -r dev type; do
-            [ -n "$dev" ] || continue
-            if [ "$type" = "disk" ]; then
-                SKIP_DISKS+=("$dev")
-            fi
-        done < <(lsblk -spnr -o NAME,TYPE "$root_src" 2>/dev/null || true)
+    local root_disk=""
+    root_disk="$(netool_lsblk_root_disk 2>/dev/null || true)"
+    if [ -n "$root_disk" ]; then
+        SKIP_DISKS+=("$root_disk")
     fi
 
-    mapfile -t SKIP_DISKS < <(uniq_list "${SKIP_DISKS[@]}")
+    netool_mapfile SKIP_DISKS < <(uniq_list ${SKIP_DISKS[@]+"${SKIP_DISKS[@]}"})
 }
 
 # 参数解析: --list 仅预览；其他非法参数报错退出
@@ -124,6 +117,11 @@ case "${1:-}" in
         ;;
 esac
 
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
+    log_error "此磁盘工具仅支持 Linux（当前：$(uname -s)）。"
+    exit 1
+fi
+
 if ! command -v lsblk >/dev/null 2>&1; then
     echo "缺少命令: lsblk"
     exit 1
@@ -133,11 +131,11 @@ fi
 detect_root_disk
 
 # 收集所有整盘设备路径
-DISKS=$(lsblk -dn -o NAME,TYPE | awk '$2=="disk"{print "/dev/"$1}')
+DISKS="$(netool_lsblk_disk_paths)"
 
 if [ "$LIST_ONLY" -eq 1 ]; then
     echo "保护盘:"
-    printf '  %s\n' "${SKIP_DISKS[@]}"
+    printf '  %s\n' ${SKIP_DISKS[@]+"${SKIP_DISKS[@]}"}
     echo
     echo "候选整盘:"
     if [ -n "$DISKS" ]; then
@@ -164,7 +162,7 @@ fi
 
 echo "开始扫描硬盘..."
 echo "将跳过:"
-printf '  %s\n' "${SKIP_DISKS[@]}"
+printf '  %s\n' ${SKIP_DISKS[@]+"${SKIP_DISKS[@]}"}
 echo
 
 if [ -z "$DISKS" ]; then
@@ -177,7 +175,7 @@ printf '%s\n' "$DISKS" | while IFS= read -r DEV; do
     [ -n "$DEV" ] || continue
 
     # 跳过保护盘列表中的硬盘
-    for SKIP in "${SKIP_DISKS[@]}"; do
+    for SKIP in ${SKIP_DISKS[@]+"${SKIP_DISKS[@]}"}; do
         if [ "$DEV" = "$SKIP" ]; then
             echo "跳过硬盘: $DEV"
             continue 2

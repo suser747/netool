@@ -68,6 +68,232 @@ tolower() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# netool_mapfile VARNAME — Bash 3.2 兼容，从 stdin 读入行到命名数组（替代 mapfile -t）
+# 注意：空数组在 Bash 3.2 + set -u 下不可写 "${arr[@]}"，须用 ${arr[@]+"${arr[@]}"}
+netool_mapfile() {
+  local __varname="$1"
+  local __line=""
+  local __i=0
+  eval "${__varname}=()"
+  while IFS= read -r __line || [[ -n "$__line" ]]; do
+    eval "${__varname}[__i]=\$__line"
+    __i=$((__i + 1))
+  done
+}
+
+# netool_run_timeout SECONDS CMD [ARGS...] — 有 timeout 则用；否则用后台+kill 兜底（macOS 无 GNU timeout）
+netool_run_timeout() {
+  local secs="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+    return $?
+  fi
+  "$@" &
+  local pid=$!
+  (
+    sleep "$secs"
+    kill "$pid" 2>/dev/null || true
+  ) &
+  local watcher=$!
+  wait "$pid" 2>/dev/null
+  local rc=$?
+  kill "$watcher" 2>/dev/null || true
+  wait "$watcher" 2>/dev/null || true
+  return "$rc"
+}
+
+# netool_primary_ip — 跨平台主 IP（Linux ip/hostname -I；macOS ipconfig/ifconfig）
+netool_primary_ip() {
+  local ip=""
+  if command -v ip >/dev/null 2>&1; then
+    ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')"
+  fi
+  if [[ -z "$ip" ]] && command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  if [[ -z "$ip" ]] && command -v ipconfig >/dev/null 2>&1; then
+    local iface
+    iface="$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')"
+    if [[ -n "$iface" ]]; then
+      ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+    fi
+    if [[ -z "$ip" ]]; then
+      ip="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+    fi
+  fi
+  if [[ -z "$ip" ]] && command -v ifconfig >/dev/null 2>&1; then
+    ip="$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')"
+  fi
+  printf '%s' "${ip:-}"
+}
+
+# netool_lsblk_mount_col — CentOS7 等旧 util-linux 只有 MOUNTPOINT
+netool_lsblk_mount_col() {
+  if [[ -n "${NETOOL_LSBLK_MOUNT_COL:-}" ]]; then
+    printf '%s' "$NETOOL_LSBLK_MOUNT_COL"
+    return 0
+  fi
+  if command -v lsblk >/dev/null 2>&1 && lsblk -o NAME,MOUNTPOINTS / >/dev/null 2>&1; then
+    NETOOL_LSBLK_MOUNT_COL="MOUNTPOINTS"
+  else
+    NETOOL_LSBLK_MOUNT_COL="MOUNTPOINT"
+  fi
+  printf '%s' "$NETOOL_LSBLK_MOUNT_COL"
+}
+
+# netool_sed_ere_opt — 输出 -r 或 -E（扩展正则），旧 GNU sed 仅有 -r
+netool_sed_ere_opt() {
+  if [[ -n "${NETOOL_SED_ERE:-}" ]]; then
+    printf '%s' "$NETOOL_SED_ERE"
+    return 0
+  fi
+  if echo a | sed -r 's/a/b/' >/dev/null 2>&1; then
+    NETOOL_SED_ERE="-r"
+  elif echo a | sed -E 's/a/b/' >/dev/null 2>&1; then
+    NETOOL_SED_ERE="-E"
+  else
+    NETOOL_SED_ERE="-r"
+  fi
+  printf '%s' "$NETOOL_SED_ERE"
+}
+
+# netool_systemctl_enable_now UNIT — 兼容无 --now 的 systemd 219
+netool_systemctl_enable_now() {
+  local unit="$1"
+  command -v systemctl >/dev/null 2>&1 || return 1
+  if systemctl enable --now "$unit" >/dev/null 2>&1; then
+    return 0
+  fi
+  systemctl enable "$unit" >/dev/null 2>&1 || true
+  systemctl start "$unit" >/dev/null 2>&1
+}
+
+# netool_listening_tcp_local_addrs — 每行一个 Local Address:Port（兼容无 ss -H / 仅有 netstat）
+netool_listening_tcp_local_addrs() {
+  if command -v ss >/dev/null 2>&1; then
+    if ss -ltnH >/dev/null 2>&1; then
+      ss -ltnH 2>/dev/null | awk '{print $4}'
+      return 0
+    fi
+    ss -ltn 2>/dev/null | awk 'NR==1 && $1=="State" {next} {print $4}'
+    return 0
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk 'NR>2 {print $4}'
+  fi
+}
+
+# netool_sort_version — sort -V 不可用时回退 sort
+netool_sort_version() {
+  if sort -V </dev/null >/dev/null 2>&1; then
+    sort -V "$@"
+  else
+    sort "$@"
+  fi
+}
+
+# netool_lsblk_disk_paths — 列出整盘绝对路径；兼容无 -p 的旧 util-linux（CentOS 7）
+netool_lsblk_disk_paths() {
+  if ! command -v lsblk >/dev/null 2>&1; then
+    return 0
+  fi
+  if lsblk -dnpo NAME,TYPE / >/dev/null 2>&1; then
+    lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2=="disk"{print $1}'
+  else
+    lsblk -dno NAME,TYPE 2>/dev/null | awk '$2=="disk" {
+      if ($1 ~ /^\//) print $1; else print "/dev/" $1
+    }'
+  fi
+}
+
+# netool_lsblk_root_disk — 根分区所在整盘绝对路径（兼容无 lsblk -s 的旧版本）
+netool_lsblk_root_disk() {
+  local root_src="" pk="" name="" type=""
+  command -v lsblk >/dev/null 2>&1 || return 1
+  root_src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+  [[ -n "$root_src" ]] || return 1
+
+  if lsblk -spnr -o NAME,TYPE "$root_src" >/dev/null 2>&1; then
+    while read -r name type; do
+      [[ -n "$name" && "$type" == "disk" ]] || continue
+      if [[ "$name" == /* ]]; then
+        printf '%s\n' "$name"
+      else
+        printf '/dev/%s\n' "$name"
+      fi
+      return 0
+    done < <(lsblk -spnr -o NAME,TYPE "$root_src" 2>/dev/null || true)
+  fi
+
+  pk="$(lsblk -no PKNAME "$root_src" 2>/dev/null | head -n1 | tr -d '[:space:]')"
+  if [[ -n "$pk" ]]; then
+    if [[ "$pk" == /* ]]; then
+      printf '%s\n' "$pk"
+    else
+      printf '/dev/%s\n' "$pk"
+    fi
+    return 0
+  fi
+  return 1
+}
+
+# netool_lsblk_supports_p — lsblk 是否支持 -p（完整设备路径）；util-linux 2.25+ 才有
+netool_lsblk_supports_p() {
+  if [[ -n "${NETOOL_LSBLK_SUPPORTS_P:-}" ]]; then
+    [[ "${NETOOL_LSBLK_SUPPORTS_P}" == "1" ]]
+    return $?
+  fi
+  if command -v lsblk >/dev/null 2>&1 && lsblk -dnpo NAME / >/dev/null 2>&1; then
+    NETOOL_LSBLK_SUPPORTS_P=1
+  else
+    NETOOL_LSBLK_SUPPORTS_P=0
+  fi
+  [[ "${NETOOL_LSBLK_SUPPORTS_P}" == "1" ]]
+}
+
+# netool_lsblk_dev_type DEV — 返回块设备 TYPE（disk/part/...），兼容无 -p
+netool_lsblk_dev_type() {
+  local dev="$1"
+  local t=""
+  if netool_lsblk_supports_p; then
+    t="$(lsblk -dnpr -o TYPE "$dev" 2>/dev/null | head -n1)"
+  else
+    t="$(lsblk -dnr -o TYPE "$dev" 2>/dev/null | head -n1)"
+  fi
+  t="${t#"${t%%[![:space:]]*}"}"
+  t="${t%"${t##*[![:space:]]}"}"
+  printf '%s' "$t"
+}
+
+# netool_lsblk_tree_name_type DEV — 输出设备树 NAME TYPE（绝对路径），兼容无 -p
+netool_lsblk_tree_name_type() {
+  local disk="$1"
+  if netool_lsblk_supports_p; then
+    lsblk -nrpo NAME,TYPE "$disk" 2>/dev/null || true
+  else
+    lsblk -nro NAME,TYPE "$disk" 2>/dev/null | awk '{
+      n=$1; t=$2;
+      if (n !~ /^\//) n="/dev/" n;
+      print n, t
+    }' || true
+  fi
+}
+
+# netool_lsblk_tree_names DEV — 输出设备树 NAME（绝对路径），兼容无 -p
+netool_lsblk_tree_names() {
+  local disk="$1"
+  if netool_lsblk_supports_p; then
+    lsblk -nrpo NAME "$disk" 2>/dev/null || true
+  else
+    lsblk -nro NAME "$disk" 2>/dev/null | awk '{
+      n=$1;
+      if (n !~ /^\//) n="/dev/" n;
+      print n
+    }' || true
+  fi
+}
+
 # -----------------------------------------------------------------------------
 # 并发控制
 # -----------------------------------------------------------------------------

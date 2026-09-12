@@ -311,7 +311,7 @@ find_enclosure_component() {
 # 返回值: 0 - 始终成功；标准输出每行一个设备路径 (按版本号排序)
 # -----------------------------------------------------------------------------
 list_disks() {
-    lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2=="disk"{print $1}' | sort -V
+    netool_lsblk_disk_paths | netool_sort_version
 }
 
 # -----------------------------------------------------------------------------
@@ -505,6 +505,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
+    log_error "此磁盘工具仅支持 Linux（当前：$(uname -s)）。"
+    exit 1
+fi
 
 need_cmd lsblk
 need_cmd readlink
